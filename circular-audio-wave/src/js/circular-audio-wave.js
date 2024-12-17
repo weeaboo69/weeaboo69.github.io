@@ -8,6 +8,9 @@ class CircularAudioWave {
         this.playing = false;
         this.lineColorOffset = 0;
         this.tick = 0;
+        this.currentTime = 0;
+        this.startTime = 0;
+        this.pausedAt = 0;
 
         let bgColor = '#2E2733';
         this.defaultChartOption = {
@@ -248,6 +251,7 @@ class CircularAudioWave {
             request.onload = () => {
                 // Preprocess buffer for bpm
                 this.offlineContext.decodeAudioData(request.response, buffer => {
+                    this._currentBuffer = buffer; // 保存當前的 buffer
                     this.sourceNode.buffer = buffer;
                     this.offlineSource.buffer = buffer;
                     this.offlineSource.start(0);
@@ -257,11 +261,9 @@ class CircularAudioWave {
                 this.offlineContext.oncomplete = e => {
                     let buffer = e.renderedBuffer;
                     this.bpm = this._getBPM([buffer.getChannelData(0), buffer.getChannelData(1)]);
-
                     this._init();
                     resolve();
                 };
-
             };
         });
     }
@@ -312,8 +314,24 @@ class CircularAudioWave {
         }
     }
     destroy() {
+        if (this.playing) {
+            this.sourceNode.stop();
+        }
+        this.playing = false;
+        this.pausedAt = 0;
         this.chart.dispose();
+        // 清理音頻相關資源
+        if (this.context) {
+            this.context.close();
+        }
     }
+
+    setVolume(value) {
+        if (this.context && this.gainNode) {
+            this.gainNode.gain.value = value;
+        }
+    }
+
     reset() {
         this.tick = 0;
         this.chartOption = JSON.parse(JSON.stringify(this.defaultChartOption));
@@ -340,9 +358,13 @@ class CircularAudioWave {
         this.analyser.smoothingTimeConstant = 0.3;
         this.analyser.fftSize = 2048;
 
+        // 添加音量控制節點
+        this.gainNode = this.context.createGain();
+        
         this.sourceNode.connect(this.analyser);
-
-        this.sourceNode.connect(this.context.destination);
+        this.sourceNode.connect(this.gainNode);
+        this.gainNode.connect(this.context.destination);
+        
         this.sourceNode.onended = this.onended.bind(this);
     }
 
