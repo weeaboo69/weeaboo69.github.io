@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>聲音控制器</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+            margin: 5px;
+        }
+
+        .button-primary {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .button-secondary {
+            background-color: #2196F3;
+            color: white;
+        }
+
+        .status-display {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 18px;
+        }
+
+        .control-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        #recordedAudio {
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        /* 新增聲波顯示區域的樣式 */
+        .waveform-container {
+            height: 200px;
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin: 20px 0;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>謀聲</h1>
+        
+        <!-- 藍芽連接 -->
+        <div class="control-section">
+            <button onclick="connectBluetooth()" class="button button-primary">連接藍芽</button>
+            <div id="status" class="status-display">未連接</div>
+            <div>播放速度：<span id="playbackRate">1.0</span>x</div>
+        </div>
+
+        <!-- 動態聲波顯示區域 -->
+        <div class="waveform-container" id="waveform">
+            <!-- 這裡將來可以放置聲波視覺化的內容 -->
+            <button onclick="wave.play()">Play</button>
+            <div id="chart-container" style="width: 100%; height: 100%;"></div>
+            <script src="../dist/circular-audio-wave.min.js"></script>
+            <script>
+                let wave = new CircularAudioWave(document.getElementById('chart-container'), {mode: 'sunburst'});
+                wave.loadAudio('audio/audio2.mp3');
+            </script>
+        </div>
+
+        <!-- 音頻控制 -->
+        <div class="control-section">
+            <h3>音檔</h3>
+            <input type="file" accept="audio/*" onchange="handleAudioFile(event)" />
+            <div id="audioControls" style="display: none;">
+                <button onclick="startPlayback()" class="button button-secondary">開始播放</button>
+                <button onclick="stopPlayback()" class="button button-secondary">停止播放</button>
+            </div>
+        </div>
+
+        <!-- 錄音控制 -->
+        <div class="control-section">
+            <h3>錄音</h3>
+            <button onclick="startRecording()" class="button button-secondary" id="recordButton">開始錄音</button>
+            <button onclick="stopRecording()" class="button button-secondary" id="stopButton" disabled>停止錄音</button>
+            <audio id="recordedAudio" controls></audio>
+        </div>
+    </div>
+
+    <script>
+        let port = null;
+        let reader = null;
+        let audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        let audioSource = null;
+        let audioBuffer = null;
+        let mediaRecorder = null;
+        let destinationStream = null;
+        let isPlaying = false;
+
+        async function handleAudioFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const arrayBuffer = await file.arrayBuffer();
+            audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            document.getElementById('audioControls').style.display = 'block';
+        }
+
+        function startPlayback() {
+            if (!audioBuffer || isPlaying) return;
+
+            audioSource = audioContext.createBufferSource();
+            audioSource.buffer = audioBuffer;
+            audioSource.connect(audioContext.destination);
+            audioSource.start();
+            isPlaying = true;
+
+            audioSource.onended = () => {
+                isPlaying = false;
+            };
+        }
+
+        function stopPlayback() {
+            if (audioSource) {
+                audioSource.stop();
+                isPlaying = false;
+            }
+        }
+
+        function startRecording() {
+            const chunks = [];
+            const dest = audioContext.createMediaStreamDestination();
+            
+            audioSource = audioContext.createBufferSource();
+            audioSource.buffer = audioBuffer;
+            audioSource.connect(dest);
+            audioSource.connect(audioContext.destination);
+            
+            mediaRecorder = new MediaRecorder(dest.stream);
+            mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'audio/webm' });
+                document.getElementById('recordedAudio').src = URL.createObjectURL(blob);
+            };
+            
+            mediaRecorder.start();
+            audioSource.start();
+            isPlaying = true;
+            
+            document.getElementById('recordButton').disabled = true;
+            document.getElementById('stopButton').disabled = false;
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                mediaRecorder.stop();
+                if (audioSource) {
+                    audioSource.stop();
+                }
+                isPlaying = false;
+            }
+            document.getElementById('recordButton').disabled = false;
+            document.getElementById('stopButton').disabled = true;
+        }
+
+        async function connectBluetooth() {
+            try {
+                if (port) {
+                    await port.close();
+                }
+                
+                document.getElementById('status').textContent = '正在連接...';
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 9600 });
+                
+                document.getElementById('status').textContent = '已連接';
+                readData();
+                
+            } catch (error) {
+                console.error('Connection error:', error);
+                document.getElementById('status').textContent = '錯誤: ' + error.message;
+            }
+        }
+
+        async function readData() {
+            try {
+                reader = port.readable.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value);
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+                    
+                    for (const line of lines) {
+                        if (line.trim()) {
+                            updateSensor(parseInt(line));
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Read error:', error);
+            } finally {
+                if (reader) {
+                    reader.releaseLock();
+                }
+            }
+        }
+
+        function updateSensor(value) {
+            if (audioSource && isPlaying) {
+                // 磁鐵靠近時速度變快
+                const playbackRate = value ? 1.0 : 0.5;  // value 為 1 時正常速度，為 0 時變慢
+                audioSource.playbackRate.value = playbackRate;
+                document.getElementById('playbackRate').textContent = playbackRate.toFixed(1);
+            }
+        }
+
+        window.addEventListener('beforeunload', async () => {
+            if (reader) {
+                await reader.cancel();
+            }
+            if (port) {
+                await port.close();
+            }
+        });
+    </script>
+</body>
+</html>
