@@ -81,12 +81,13 @@
             background: #1976D2;
         }
 
-        .mode-select {
+        .select {
             padding: 10px;
             border-radius: 5px;
             background: #333;
             color: white;
             border: 1px solid #444;
+            min-width: 200px;
         }
 
         .status {
@@ -104,6 +105,12 @@
         .volume-slider {
             width: 100px;
         }
+
+        .audio-select-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
     </style>
 </head>
 <body>
@@ -112,8 +119,19 @@
     </div>
 
     <div class="controls">
-        <input type="file" id="audio-input" class="file-input" accept="audio/*">
-        <label for="audio-input" class="file-label">選擇音檔</label>
+        <div class="audio-select-container">
+            <select id="audioSelect" class="select">
+                <option value="">選擇預設音樂</option>
+                <option value="audio/4thewin.mp3">歌曲 1</option>
+                <option value="audio/屋頂.mp3">歌曲 2</option>
+                <option value="audio/想約.wav">歌曲 3</option>
+            </select>
+            
+            <span>或</span>
+            
+            <input type="file" id="audio-input" class="file-input" accept="audio/*">
+            <label for="audio-input" class="file-label">上傳音檔</label>
+        </div>
         
         <div class="btn-group">
             <button id="playBtn" class="btn" disabled>播放</button>
@@ -127,7 +145,7 @@
             <span id="volumeValue">100%</span>
         </div>
 
-        <select id="modeSelect" class="mode-select">
+        <select id="modeSelect" class="select">
             <option value="default">默認波形</option>
             <option value="sunburst">太陽爆發效果</option>
         </select>
@@ -136,7 +154,7 @@
     <div id="chart-container"></div>
     
     <div id="status" class="status">
-        等待選擇音檔...
+        請選擇或上傳音檔...
     </div>
 
     <script>
@@ -147,6 +165,7 @@
         const pauseBtn = document.getElementById('pauseBtn');
         const stopBtn = document.getElementById('stopBtn');
         const audioInput = document.getElementById('audio-input');
+        const audioSelect = document.getElementById('audioSelect');
         const volumeSlider = document.getElementById('volumeSlider');
         const volumeValue = document.getElementById('volumeValue');
         const modeSelect = document.getElementById('modeSelect');
@@ -162,24 +181,37 @@
             });
         }
 
-        audioInput.addEventListener('change', async (e) => {
+        async function loadAudio(audioUrl, displayName) {
+            status.textContent = '正在載入音檔...';
+            initVisualizer(modeSelect.value);
+            
+            try {
+                await wave.loadAudio(audioUrl);
+                status.textContent = `已載入: ${displayName}`;
+                playBtn.disabled = false;
+                pauseBtn.disabled = true;
+                stopBtn.disabled = false;
+            } catch (err) {
+                status.textContent = '載入音檔失敗';
+                console.error(err);
+            }
+        }
+
+        audioSelect.addEventListener('change', (e) => {
+            const selectedValue = e.target.value;
+            if (selectedValue) {
+                const displayName = e.target.options[e.target.selectedIndex].text;
+                loadAudio(selectedValue, displayName);
+                audioInput.value = ''; // 清除檔案上傳input
+            }
+        });
+
+        audioInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
-                status.textContent = '正在載入音檔...';
                 const audioUrl = URL.createObjectURL(file);
-                
-                initVisualizer(modeSelect.value);
-                
-                try {
-                    await wave.loadAudio(audioUrl);
-                    status.textContent = `已載入: ${file.name}`;
-                    playBtn.disabled = false;
-                    pauseBtn.disabled = true;
-                    stopBtn.disabled = false;
-                } catch (err) {
-                    status.textContent = '載入音檔失敗';
-                    console.error(err);
-                }
+                loadAudio(audioUrl, file.name);
+                audioSelect.value = ''; // 清除預設音樂選擇
             }
         });
 
@@ -226,9 +258,16 @@
         modeSelect.addEventListener('change', (e) => {
             const currentlyPlaying = isPlaying;
             initVisualizer(e.target.value);
-            if (audioInput.files[0]) {
-                const audioUrl = URL.createObjectURL(audioInput.files[0]);
-                wave.loadAudio(audioUrl).then(() => {
+            
+            // 重新載入當前選擇的音檔
+            const selectedAudio = audioSelect.value || 
+                               (audioInput.files[0] && URL.createObjectURL(audioInput.files[0]));
+            const displayName = audioSelect.value ? 
+                              audioSelect.options[audioSelect.selectedIndex].text :
+                              (audioInput.files[0] && audioInput.files[0].name);
+                              
+            if (selectedAudio && displayName) {
+                loadAudio(selectedAudio, displayName).then(() => {
                     if (currentlyPlaying) {
                         wave.play();
                         isPlaying = true;
