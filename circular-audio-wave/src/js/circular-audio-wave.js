@@ -280,7 +280,16 @@ class CircularAudioWave {
         if (this.sourceNode && this.sourceNode.buffer) {
             this.playing = true;
             this.presetOption();
-            this.sourceNode.start(0);
+            
+            // 如果是從暫停狀態恢復
+            if (this.pausedAt) {
+                this.startTime = this.context.currentTime - this.pausedAt;
+                this.sourceNode.start(0, this.pausedAt);
+            } else {
+                this.startTime = this.context.currentTime;
+                this.sourceNode.start(0);
+            }
+            
             this._debouncedDraw();
         } else {
             alert('Audio is not ready');
@@ -288,7 +297,19 @@ class CircularAudioWave {
     }
     // TODO
     pause() {
-
+        if (this.playing) {
+            this.playing = false;
+            this.pausedAt = this.context.currentTime - this.startTime;
+            this.sourceNode.stop();
+            
+            // 重新創建音頻節點
+            this.sourceNode = this.context.createBufferSource();
+            this.sourceNode.buffer = this._currentBuffer;
+            this.sourceNode.connect(this.analyser);
+            this.sourceNode.connect(this.context.destination);
+            this.sourceNode.onended = this.onended.bind(this);
+            this.sourceNode.loop = !!this.opts.loop;
+        }
     }
     destroy() {
         this.chart.dispose();

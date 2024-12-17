@@ -152,7 +152,6 @@
         const modeSelect = document.getElementById('modeSelect');
         const status = document.getElementById('status');
 
-        // 初始化視覺化器
         function initVisualizer(mode = 'default') {
             if (wave) {
                 wave.destroy();
@@ -163,22 +162,19 @@
             });
         }
 
-        // 處理音檔選擇
         audioInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (file) {
                 status.textContent = '正在載入音檔...';
-                
-                // 創建音檔 URL
                 const audioUrl = URL.createObjectURL(file);
                 
-                // 初始化視覺化器
                 initVisualizer(modeSelect.value);
                 
                 try {
                     await wave.loadAudio(audioUrl);
                     status.textContent = `已載入: ${file.name}`;
                     playBtn.disabled = false;
+                    pauseBtn.disabled = true;
                     stopBtn.disabled = false;
                 } catch (err) {
                     status.textContent = '載入音檔失敗';
@@ -187,7 +183,6 @@
             }
         });
 
-        // 播放控制
         playBtn.addEventListener('click', () => {
             if (wave && !isPlaying) {
                 wave.play();
@@ -215,29 +210,35 @@
                 isPlaying = false;
                 playBtn.disabled = false;
                 pauseBtn.disabled = true;
+                stopBtn.disabled = false;
                 status.textContent = '已停止';
             }
         });
 
-        // 音量控制
         volumeSlider.addEventListener('input', (e) => {
             const value = e.target.value;
             volumeValue.textContent = `${value}%`;
             if (wave) {
-                // 假設 CircularAudioWave 有 setVolume 方法
                 wave.setVolume(value / 100);
             }
         });
 
-        // 模式切換
         modeSelect.addEventListener('change', (e) => {
+            const currentlyPlaying = isPlaying;
             initVisualizer(e.target.value);
-            if (isPlaying) {
-                wave.play();
+            if (audioInput.files[0]) {
+                const audioUrl = URL.createObjectURL(audioInput.files[0]);
+                wave.loadAudio(audioUrl).then(() => {
+                    if (currentlyPlaying) {
+                        wave.play();
+                        isPlaying = true;
+                        playBtn.disabled = true;
+                        pauseBtn.disabled = false;
+                    }
+                });
             }
         });
 
-        // 初始化
         initVisualizer();
     </script>
 </body>
