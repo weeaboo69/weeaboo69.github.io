@@ -11,6 +11,9 @@ class CircularAudioWave {
         this.currentTime = 0;
         this.startTime = 0;
         this.pausedAt = 0;
+        this.playbackRate = 1;
+        this.minPlaybackRate = 0.5;  // 最慢速度
+        this.maxPlaybackRate = 1.0;  // 最快速度
 
         let bgColor = '#2E2733';
         this.defaultChartOption = {
@@ -278,12 +281,31 @@ class CircularAudioWave {
         }
     }
 
+    setPlaybackRate(magneticValue) {
+        // magneticValue 範圍是 0-100
+        // 將磁力值轉換為播放速度：磁力越強，速度越慢
+        const normalizedValue = magneticValue / 100;
+        this.playbackRate = this.maxPlaybackRate - 
+            (normalizedValue * (this.maxPlaybackRate - this.minPlaybackRate));
+        
+        // 確保播放速度在合理範圍內
+        this.playbackRate = Math.max(this.minPlaybackRate, 
+            Math.min(this.maxPlaybackRate, this.playbackRate));
+        
+        // 更新音頻節點的播放速度
+        if (this.sourceNode) {
+            this.sourceNode.playbackRate.setValueAtTime(
+                this.playbackRate, 
+                this.context.currentTime
+            );
+        }
+    }
+
     play() {
         if (this.sourceNode && this.sourceNode.buffer) {
             this.playing = true;
             this.presetOption();
             
-            // 如果是從暫停狀態恢復
             if (this.pausedAt) {
                 this.startTime = this.context.currentTime - this.pausedAt;
                 this.sourceNode.start(0, this.pausedAt);
@@ -291,6 +313,12 @@ class CircularAudioWave {
                 this.startTime = this.context.currentTime;
                 this.sourceNode.start(0);
             }
+            
+            // 設置初始播放速度
+            this.sourceNode.playbackRate.setValueAtTime(
+                this.playbackRate, 
+                this.context.currentTime
+            );
             
             this._debouncedDraw();
         } else {

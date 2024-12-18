@@ -88,11 +88,42 @@
         .volume-slider {
             width: 100px;
         }
+
+        .bluetooth-control {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin: 1rem;
+        }
+
+        .magnetic-value {
+            background: #333;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            min-width: 100px;
+            text-align: center;
+        }
+
+        .connection-status {
+            color: #666;
+        }
+
+        .connection-status.connected {
+            color: #4CAF50;
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>謀聲</h1>
+    </div>
+
+    <div class="bluetooth-control">
+        <button id="connectBtn" class="btn">連接藍牙裝置</button>
+        <div id="connectionStatus" class="connection-status">未連接</div>
+        <div class="magnetic-value">
+            磁力值: <span id="magneticValue">0</span>
+        </div>
     </div>
 
     <div class="controls">
@@ -130,6 +161,8 @@
     <script>
         let wave = null;
         let isPlaying = false;
+        let bluetoothDevice = null;
+        let bluetoothCharacteristic = null;
         
         const playBtn = document.getElementById('playBtn');
         const pauseBtn = document.getElementById('pauseBtn');
@@ -165,6 +198,57 @@
                 console.error(err);
             }
         }
+
+        async function connectBluetooth() {
+            try {
+                bluetoothDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{ services: ['0000ffe0-0000-1000-8000-00805f9b34fb'] }]
+                });
+
+                const server = await bluetoothDevice.gatt.connect();
+                const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
+                bluetoothCharacteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
+                
+                // 訂閱通知
+                await bluetoothCharacteristic.startNotifications();
+                bluetoothCharacteristic.addEventListener('characteristicvaluechanged', handleMagneticData);
+                
+                document.getElementById('connectionStatus').textContent = '已連接';
+                document.getElementById('connectionStatus').classList.add('connected');
+                document.getElementById('connectBtn').textContent = '斷開連接';
+            } catch (error) {
+                console.error('藍牙連接錯誤:', error);
+                alert('藍牙連接失敗');
+            }
+        }
+
+        // 處理磁力數據
+        function handleMagneticData(event) {
+            const value = new TextDecoder().decode(event.target.value);
+            const magneticValue = parseInt(value);
+            
+            document.getElementById('magneticValue').textContent = magneticValue;
+            
+            if (wave && isPlaying) {
+                wave.setPlaybackRate(magneticValue);
+            }
+        }
+
+        // 修改 connectBtn 的事件監聽器
+        document.getElementById('connectBtn').addEventListener('click', async () => {
+            if (!bluetoothDevice || !bluetoothDevice.gatt.connected) {
+                await connectBluetooth();
+            } else {
+                if (bluetoothCharacteristic) {
+                    await bluetoothCharacteristic.stopNotifications();
+                }
+                await bluetoothDevice.gatt.disconnect();
+                document.getElementById('connectionStatus').textContent = '未連接';
+                document.getElementById('connectionStatus').classList.remove('connected');
+                document.getElementById('connectBtn').textContent = '連接藍牙裝置';
+                bluetoothDevice = null;
+            }
+        });
 
         audioSelect.addEventListener('change', (e) => {
             const selectedValue = e.target.value;
