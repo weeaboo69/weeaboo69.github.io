@@ -1,0 +1,10 @@
+{
+    "name": "Magnetic Audio Controller",
+    "short_name": "MagAudio",
+    "start_url": "/",
+    "display": "standalone",
+    "permissions": ["bluetooth"],
+    "features": {
+      "bluetooth": {}
+    }
+  }
