@@ -82,6 +82,75 @@
         .speed-value {
             min-width: 60px;
         }
+
+        .serial-controls {
+    background: #2d2d2d;
+    padding: 1rem;
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    align-items: center;
+}
+
+.serial-status {
+    color: #4CAF50;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    background: rgba(76, 175, 80, 0.1);
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    font-size: 0.9rem;
+}
+
+/* 連接按鈕特殊樣式 */
+.connect-btn {
+    background: #2196F3;
+    color: white;
+    padding: 8px 20px;
+    border-radius: 20px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.connect-btn:hover {
+    background: #1976D2;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.connect-btn:active {
+    transform: translateY(1px);
+}
+
+.connect-btn.connected {
+    background: #4CAF50;
+}
+
+.connect-btn.connected:hover {
+    background: #388E3C;
+}
+
+.connect-btn:disabled {
+    background: #9e9e9e;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* 添加連接圖標 */
+.connect-btn::before {
+    content: "⚡";
+    font-size: 1.1em;
+}
+
+.connect-btn.connected::before {
+    content: "✓";
+}
     </style>
 </head>
 <body>
@@ -90,9 +159,8 @@
     </div>
 
     <div class="serial-controls">
-        <button id="connectBtn" class="btn">連接Arduino</button>
+        <button id="connectBtn" class="btn connect-btn">連接Arduino</button>
         <span id="serialStatus" class="serial-status">未連接</span>
-        <button id="toggleDebug" class="btn">顯示除錯訊息</button>
     </div>
 
     <div id="debugInfo" class="debug-info"></div>
@@ -138,78 +206,85 @@
         let currentSpeedPercent = 100;
 
         async function connectSerial() {
-            try {
-                port = await navigator.serial.requestPort();
-                await port.open({ baudRate: 9600 });
-                
-                const serialStatus = document.getElementById('serialStatus');
-                serialStatus.textContent = '已連接';
-                
-                keepReading = true;
-                reader = port.readable.getReader();
-                readSerial();
-                
-                document.getElementById('connectBtn').textContent = '中斷連接';
-            } catch (err) {
-                const serialStatus = document.getElementById('serialStatus');
-                serialStatus.textContent = '連接失敗';
-            }
-        }
+    try {
+        port = await navigator.serial.requestPort();
+        await port.open({ baudRate: 9600 });
+        
+        const serialStatus = document.getElementById('serialStatus');
+        const connectBtn = document.getElementById('connectBtn');
+        
+        serialStatus.textContent = '已連接';
+        connectBtn.textContent = '中斷連接';
+        connectBtn.classList.add('connected');
+        
+        keepReading = true;
+        reader = port.readable.getReader();
+        readSerial();
+        
+    } catch (err) {
+        const serialStatus = document.getElementById('serialStatus');
+        serialStatus.textContent = '連接失敗';
+    }
+}
 
-        async function disconnectSerial() {
-            if (reader) {
-                keepReading = false;
-                await reader.cancel();
-                await reader.releaseLock();
-            }
-            if (port) {
-                await port.close();
-            }
-            
-            const serialStatus = document.getElementById('serialStatus');
-            serialStatus.textContent = '未連接';
-            document.getElementById('connectBtn').textContent = '連接Arduino';
-        }
+async function disconnectSerial() {
+    if (reader) {
+        keepReading = false;
+        await reader.cancel();
+        await reader.releaseLock();
+    }
+    if (port) {
+        await port.close();
+    }
+    
+    const serialStatus = document.getElementById('serialStatus');
+    const connectBtn = document.getElementById('connectBtn');
+    
+    serialStatus.textContent = '未連接';
+    connectBtn.textContent = '連接Arduino';
+    connectBtn.classList.remove('connected');
+}
 
         async function readSerial() {
-            let buffer = '';
-            while (port.readable && keepReading) {
-                try {
-                    while (true) {
-                        const { value, done } = await reader.read();
-                        if (done) break;
+    let buffer = '';
+    while (port.readable && keepReading) {
+        try {
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
 
-                        const textDecoder = new TextDecoder();
-                        const chunk = textDecoder.decode(value);
-                        buffer += chunk;
+                const textDecoder = new TextDecoder();
+                const chunk = textDecoder.decode(value);
+                buffer += chunk;
 
-                        const lines = buffer.split('\n');
-                        buffer = lines.pop() || '';
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
 
-                        for (let line of lines) {
-                            line = line.trim();
-                            if (line) {
-                                const sensorValue = parseInt(line);
-                                if (!isNaN(sensorValue)) {
-                                    // 將感應器值轉換為播放速度（0.5x 到 2.0x）
-                                    const speed = 0.5 + (sensorValue / 100) * 1.5;
-                                    const roundedSpeed = Math.round(speed * 100) / 100;
-                                    
-                                    document.getElementById('speedValue').textContent = 
-                                        `${roundedSpeed.toFixed(2)}x`;
-                                    
-                                    if (wave && wave.sourceNode) {
-                                        wave.sourceNode.playbackRate.value = roundedSpeed;
-                                    }
-                                }
+                for (let line of lines) {
+                    line = line.trim();
+                    if (line) {
+                        const sensorValue = parseInt(line);
+                        if (!isNaN(sensorValue)) {
+                            // 調整速度範圍為 0.5x 到 1.5x
+                            const speed = 0.5 + (sensorValue / 100);
+                            const roundedSpeed = Math.round(speed * 100) / 100;
+                            
+                            document.getElementById('speedValue').textContent = 
+                                `${roundedSpeed.toFixed(2)}x`;
+                            
+                            if (wave && wave.sourceNode) {
+                                wave.sourceNode.playbackRate.value = roundedSpeed;
                             }
                         }
                     }
-                } catch (error) {
-                    break;
                 }
             }
+        } catch (error) {
+            break;
         }
+    }
+}
+
 
         document.getElementById('connectBtn').addEventListener('click', async () => {
             if (port) {
