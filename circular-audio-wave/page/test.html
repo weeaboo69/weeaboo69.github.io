@@ -201,34 +201,51 @@
 
         async function connectBluetooth() {
     try {
+        console.log('開始搜尋藍牙裝置...');
+        
+        // 修改為適合 HC-06 的配置
         bluetoothDevice = await navigator.bluetooth.requestDevice({
-            // 改用 SPP 服務或允許所有可用服務
+            // 接受所有藍牙裝置
             acceptAllDevices: true,
-            optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb']
+            // 包含所有可能的服務
+            optionalServices: [
+                '00001101-0000-1000-8000-00805f9b34fb',  // SPP 服務
+                '0000ffe0-0000-1000-8000-00805f9b34fb'   // 序列埠服務
+            ]
         });
 
-        console.log('設備已選擇:', bluetoothDevice.name);
+        console.log('找到裝置:', bluetoothDevice.name);
         
+        // 連接到 GATT 伺服器
         const server = await bluetoothDevice.gatt.connect();
-        console.log('GATT 伺服器已連接');
+        console.log('已連接到 GATT 伺服器');
         
-        // 列出所有可用服務
+        // 列出所有可用的服務
         const services = await server.getPrimaryServices();
-        console.log('可用服務:', services);
+        console.log('可用的服務:', services);
         
-        const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
-        console.log('服務已獲取');
+        // 嘗試連接第一個可用的服務
+        const service = services[0];
+        console.log('使用服務:', service.uuid);
         
-        bluetoothCharacteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
-        console.log('特徵值已獲取');
-
+        // 獲取特徵值
+        const characteristics = await service.getCharacteristics();
+        console.log('可用的特徵值:', characteristics);
+        
+        bluetoothCharacteristic = characteristics[0];
+        
+        // 開始接收通知
         await bluetoothCharacteristic.startNotifications();
-        console.log('通知已開啟');
-        
         bluetoothCharacteristic.addEventListener('characteristicvaluechanged', handleMagneticData);
+        
+        document.getElementById('connectionStatus').textContent = '已連接';
+        document.getElementById('connectionStatus').classList.add('connected');
+        document.getElementById('connectBtn').textContent = '斷開連接';
+        
     } catch (error) {
-        console.error('藍牙連接詳細錯誤:', error);
-        alert(`藍牙連接失敗: ${error.message}`);
+        console.error('藍牙連接錯誤:', error);
+        console.error('錯誤詳情:', error.message);
+        alert('藍牙連接失敗: ' + error.message);
     }
 }
 
