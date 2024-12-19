@@ -245,7 +245,7 @@ async function disconnectSerial() {
     connectBtn.classList.remove('connected');
 }
 
-        async function readSerial() {
+async function readSerial() {
     let buffer = '';
     while (port.readable && keepReading) {
         try {
@@ -265,8 +265,9 @@ async function disconnectSerial() {
                     if (line) {
                         const sensorValue = parseInt(line);
                         if (!isNaN(sensorValue)) {
-                            // 調整速度範圍為 0.5x 到 1.5x
-                            const speed = 0.5 + (sensorValue / 100);
+                            // 當感應器值為 100 時，速度為 1x
+                            // 當感應器值為 0 時，速度為 2x
+                            const speed = 2 - (sensorValue / 100);
                             const roundedSpeed = Math.round(speed * 100) / 100;
                             
                             document.getElementById('speedValue').textContent = 
