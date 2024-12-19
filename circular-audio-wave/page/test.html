@@ -200,27 +200,37 @@
         }
 
         async function connectBluetooth() {
-            try {
-                bluetoothDevice = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: ['0000ffe0-0000-1000-8000-00805f9b34fb'] }]
-                });
+    try {
+        bluetoothDevice = await navigator.bluetooth.requestDevice({
+            // 改用 SPP 服務或允許所有可用服務
+            acceptAllDevices: true,
+            optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb']
+        });
 
-                const server = await bluetoothDevice.gatt.connect();
-                const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
-                bluetoothCharacteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
-                
-                // 訂閱通知
-                await bluetoothCharacteristic.startNotifications();
-                bluetoothCharacteristic.addEventListener('characteristicvaluechanged', handleMagneticData);
-                
-                document.getElementById('connectionStatus').textContent = '已連接';
-                document.getElementById('connectionStatus').classList.add('connected');
-                document.getElementById('connectBtn').textContent = '斷開連接';
-            } catch (error) {
-                console.error('藍牙連接錯誤:', error);
-                alert('藍牙連接失敗');
-            }
-        }
+        console.log('設備已選擇:', bluetoothDevice.name);
+        
+        const server = await bluetoothDevice.gatt.connect();
+        console.log('GATT 伺服器已連接');
+        
+        // 列出所有可用服務
+        const services = await server.getPrimaryServices();
+        console.log('可用服務:', services);
+        
+        const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
+        console.log('服務已獲取');
+        
+        bluetoothCharacteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
+        console.log('特徵值已獲取');
+
+        await bluetoothCharacteristic.startNotifications();
+        console.log('通知已開啟');
+        
+        bluetoothCharacteristic.addEventListener('characteristicvaluechanged', handleMagneticData);
+    } catch (error) {
+        console.error('藍牙連接詳細錯誤:', error);
+        alert(`藍牙連接失敗: ${error.message}`);
+    }
+}
 
         // 處理磁力數據
         function handleMagneticData(event) {
