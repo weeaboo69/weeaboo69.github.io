@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>謀聲</title>
-    <link rel="manifest" href="/manifest.json">
+    <title>Arduino Audio Visualizer</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
     <script src="../src/js/circular-audio-wave.js"></script>
     <style>
@@ -80,270 +79,178 @@
             color: #888;
         }
 
-        .volume-control {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .volume-slider {
-            width: 100px;
-        }
-
-        .bluetooth-control {
+        .arduino-controls {
             display: flex;
             align-items: center;
             gap: 1rem;
             margin: 1rem;
+            justify-content: center;
         }
 
-        .magnetic-value {
-            background: #333;
-            padding: 0.5rem 1rem;
-            border-radius: 5px;
+        #sensorValue {
+            font-size: 1.2rem;
             min-width: 100px;
             text-align: center;
-        }
-
-        .connection-status {
-            color: #666;
-        }
-
-        .connection-status.connected {
-            color: #4CAF50;
         }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>謀聲</h1>
+        <h1>Arduino Audio Visualizer</h1>
     </div>
 
-    <div class="bluetooth-control">
-        <button id="connectBtn" class="btn">連接藍牙裝置</button>
-        <div id="connectionStatus" class="connection-status">未連接</div>
-        <div class="magnetic-value">
-            磁力值: <span id="magneticValue">0</span>
-        </div>
+    <div class="arduino-controls">
+        <button id="connectBtn" class="btn">Connect Arduino</button>
+        <div id="sensorValue">Sensor: --</div>
     </div>
 
     <div class="controls">
-        <select id="audioSelect" class="select">
-            <option value="">選擇預設音樂</option>
-            <option value="audio/4thewin.mp3">歌曲 1</option>
-            <option value="audio/屋頂.mp3">歌曲 2</option>
-            <option value="audio/想約.wav">歌曲 3</option>
-        </select>
-        
         <div class="btn-group">
-            <button id="playBtn" class="btn" disabled>播放</button>
-            <button id="pauseBtn" class="btn" disabled>暫停</button>
-            <button id="stopBtn" class="btn" disabled>停止</button>
-        </div>
-
-        <div class="volume-control">
-            <span>音量</span>
-            <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="100">
-            <span id="volumeValue">100%</span>
+            <button id="startBtn" class="btn" disabled>Start Visualization</button>
+            <button id="stopBtn" class="btn" disabled>Stop</button>
         </div>
 
         <select id="modeSelect" class="select">
-            <option value="default">默認波形</option>
-            <option value="sunburst">太陽爆發效果</option>
+            <option value="default">Default Wave</option>
+            <option value="sunburst">Sunburst Effect</option>
         </select>
     </div>
 
     <div id="chart-container"></div>
     
     <div id="status" class="status">
-        請選擇音樂...
+        Please connect Arduino...
     </div>
 
     <script>
         let wave = null;
-        let isPlaying = false;
-        let bluetoothDevice = null;
-        let bluetoothCharacteristic = null;
+        let port = null;
+        let reader = null;
+        let isReading = false;
         
-        const playBtn = document.getElementById('playBtn');
-        const pauseBtn = document.getElementById('pauseBtn');
+        const connectBtn = document.getElementById('connectBtn');
+        const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
-        const audioSelect = document.getElementById('audioSelect');
-        const volumeSlider = document.getElementById('volumeSlider');
-        const volumeValue = document.getElementById('volumeValue');
         const modeSelect = document.getElementById('modeSelect');
         const status = document.getElementById('status');
+        const sensorValue = document.getElementById('sensorValue');
 
+        // Initialize visualizer
         function initVisualizer(mode = 'default') {
             if (wave) {
                 wave.destroy();
             }
             wave = new CircularAudioWave(document.getElementById('chart-container'), {
-                mode: mode,
-                loop: false
+                mode: mode
             });
         }
 
-        async function loadAudio(audioUrl, displayName) {
-            status.textContent = '正在載入音樂...';
-            initVisualizer(modeSelect.value);
+        // Connect to Arduino
+        async function connectArduino() {
+            try {
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 9600 });
+                
+                status.textContent = 'Arduino connected!';
+                connectBtn.textContent = 'Disconnect';
+                startBtn.disabled = false;
+                
+                startReading();
+            } catch (err) {
+                console.error('Error:', err);
+                status.textContent = 'Connection failed: ' + err.message;
+            }
+        }
+
+        // Read data from Arduino
+        async function startReading() {
+            if (!port) return;
+            
+            reader = port.readable.getReader();
+            isReading = true;
             
             try {
-                await wave.loadAudio(audioUrl);
-                status.textContent = `已載入: ${displayName}`;
-                playBtn.disabled = false;
-                pauseBtn.disabled = true;
-                stopBtn.disabled = false;
-            } catch (err) {
-                status.textContent = '載入音樂失敗';
-                console.error(err);
-            }
-        }
-
-        async function connectBluetooth() {
-    try {
-        console.log('開始搜尋藍牙裝置...');
-        
-        // 修改為適合 HC-06 的配置
-        bluetoothDevice = await navigator.bluetooth.requestDevice({
-            // 接受所有藍牙裝置
-            acceptAllDevices: true,
-            // 包含所有可能的服務
-            optionalServices: [
-                '00001101-0000-1000-8000-00805f9b34fb',  // SPP 服務
-                '0000ffe0-0000-1000-8000-00805f9b34fb'   // 序列埠服務
-            ]
-        });
-
-        console.log('找到裝置:', bluetoothDevice.name);
-        
-        // 連接到 GATT 伺服器
-        const server = await bluetoothDevice.gatt.connect();
-        console.log('已連接到 GATT 伺服器');
-        
-        // 列出所有可用的服務
-        const services = await server.getPrimaryServices();
-        console.log('可用的服務:', services);
-        
-        // 嘗試連接第一個可用的服務
-        const service = services[0];
-        console.log('使用服務:', service.uuid);
-        
-        // 獲取特徵值
-        const characteristics = await service.getCharacteristics();
-        console.log('可用的特徵值:', characteristics);
-        
-        bluetoothCharacteristic = characteristics[0];
-        
-        // 開始接收通知
-        await bluetoothCharacteristic.startNotifications();
-        bluetoothCharacteristic.addEventListener('characteristicvaluechanged', handleMagneticData);
-        
-        document.getElementById('connectionStatus').textContent = '已連接';
-        document.getElementById('connectionStatus').classList.add('connected');
-        document.getElementById('connectBtn').textContent = '斷開連接';
-        
-    } catch (error) {
-        console.error('藍牙連接錯誤:', error);
-        console.error('錯誤詳情:', error.message);
-        alert('藍牙連接失敗: ' + error.message);
-    }
-}
-
-        // 處理磁力數據
-        function handleMagneticData(event) {
-            const value = new TextDecoder().decode(event.target.value);
-            const magneticValue = parseInt(value);
-            
-            document.getElementById('magneticValue').textContent = magneticValue;
-            
-            if (wave && isPlaying) {
-                wave.setPlaybackRate(magneticValue);
-            }
-        }
-
-        // 修改 connectBtn 的事件監聽器
-        document.getElementById('connectBtn').addEventListener('click', async () => {
-            if (!bluetoothDevice || !bluetoothDevice.gatt.connected) {
-                await connectBluetooth();
-            } else {
-                if (bluetoothCharacteristic) {
-                    await bluetoothCharacteristic.stopNotifications();
+                while (isReading) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    
+                    // Convert the received data
+                    const text = new TextDecoder().decode(value);
+                    const sensorData = parseInt(text.trim());
+                    
+                    if (!isNaN(sensorData)) {
+                        sensorValue.textContent = `Sensor: ${sensorData}`;
+                        
+                        // Update visualization based on sensor value
+                        if (wave) {
+                            // Map sensor value (0-100) to frequency data (0-255)
+                            const mappedValue = Math.floor(sensorData * 2.55);
+                            const freqData = new Uint8Array(361).fill(mappedValue);
+                            wave._draw(freqData);
+                        }
+                    }
                 }
-                await bluetoothDevice.gatt.disconnect();
-                document.getElementById('connectionStatus').textContent = '未連接';
-                document.getElementById('connectionStatus').classList.remove('connected');
-                document.getElementById('connectBtn').textContent = '連接藍牙裝置';
-                bluetoothDevice = null;
+            } catch (err) {
+                console.error('Read error:', err);
+            } finally {
+                reader.releaseLock();
+            }
+        }
+
+        // Stop reading
+        async function stopReading() {
+            if (reader) {
+                isReading = false;
+                await reader.cancel();
+            }
+        }
+
+        // Event Listeners
+        connectBtn.addEventListener('click', async () => {
+            if (!port) {
+                await connectArduino();
+            } else {
+                isReading = false;
+                await stopReading();
+                await port.close();
+                port = null;
+                
+                connectBtn.textContent = 'Connect Arduino';
+                startBtn.disabled = true;
+                stopBtn.disabled = true;
+                status.textContent = 'Disconnected';
+                sensorValue.textContent = 'Sensor: --';
             }
         });
 
-        audioSelect.addEventListener('change', (e) => {
-            const selectedValue = e.target.value;
-            if (selectedValue) {
-                const displayName = e.target.options[e.target.selectedIndex].text;
-                loadAudio(selectedValue, displayName);
-            }
-        });
-
-        playBtn.addEventListener('click', () => {
-            if (wave && !isPlaying) {
-                wave.play();
-                isPlaying = true;
-                playBtn.disabled = true;
-                pauseBtn.disabled = false;
-                status.textContent = '播放中...';
-            }
-        });
-
-        pauseBtn.addEventListener('click', () => {
-            if (wave && isPlaying) {
-                wave.pause();
-                isPlaying = false;
-                playBtn.disabled = false;
-                pauseBtn.disabled = true;
-                status.textContent = '已暫停';
-            }
+        startBtn.addEventListener('click', () => {
+            initVisualizer(modeSelect.value);
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            status.textContent = 'Visualizing...';
         });
 
         stopBtn.addEventListener('click', () => {
             if (wave) {
                 wave.destroy();
                 initVisualizer(modeSelect.value);
-                isPlaying = false;
-                playBtn.disabled = false;
-                pauseBtn.disabled = true;
-                stopBtn.disabled = false;
-                status.textContent = '已停止';
             }
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            status.textContent = 'Stopped';
         });
 
-        volumeSlider.addEventListener('input', (e) => {
-            const value = e.target.value;
-            volumeValue.textContent = `${value}%`;
+        modeSelect.addEventListener('change', () => {
             if (wave) {
-                wave.setVolume(value / 100);
+                initVisualizer(modeSelect.value);
             }
         });
 
-        modeSelect.addEventListener('change', (e) => {
-            const currentlyPlaying = isPlaying;
-            initVisualizer(e.target.value);
-            
-            const selectedAudio = audioSelect.value;
-            const displayName = audioSelect.options[audioSelect.selectedIndex].text;
-            
-            if (selectedAudio) {
-                loadAudio(selectedAudio, displayName).then(() => {
-                    if (currentlyPlaying) {
-                        wave.play();
-                        isPlaying = true;
-                        playBtn.disabled = true;
-                        pauseBtn.disabled = false;
-                    }
-                });
-            }
-        });
+        // Check if Web Serial API is supported
+        if (!navigator.serial) {
+            status.textContent = 'Web Serial API not supported in this browser';
+            connectBtn.disabled = true;
+        }
 
         initVisualizer();
     </script>
