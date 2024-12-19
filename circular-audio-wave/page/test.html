@@ -73,49 +73,14 @@
             min-width: 200px;
         }
 
-        .status {
-            margin-top: 1rem;
-            text-align: center;
-            color: #888;
-        }
-
-        .volume-control {
+        .speed-control {
             display: flex;
             align-items: center;
             gap: 0.5rem;
         }
 
-        .volume-slider {
-            width: 100px;
-        }
-        .serial-controls {
-            background: #2d2d2d;
-            padding: 1rem;
-            margin-top: 1rem;
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-            flex-wrap: wrap;
-        }
-
-        .serial-status {
-            color: #4CAF50;
-            margin-left: 1rem;
-        }
-
-        .error-message {
-            color: #ff4444;
-            margin-top: 0.5rem;
-            text-align: center;
-        }
-
-        .debug-info {
-            background: #333;
-            padding: 1rem;
-            margin: 1rem;
-            border-radius: 5px;
-            font-family: monospace;
-            display: none;
+        .speed-value {
+            min-width: 60px;
         }
     </style>
 </head>
@@ -147,10 +112,9 @@
             <button id="stopBtn" class="btn" disabled>停止</button>
         </div>
 
-        <div class="volume-control">
-            <span>音量</span>
-            <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="100">
-            <span id="volumeValue">100%</span>
+        <div class="speed-control">
+            <span>速度:</span>
+            <span id="speedValue" class="speed-value">1.0x</span>
         </div>
 
         <select id="modeSelect" class="select">
