@@ -33,6 +33,15 @@
             flex-wrap: wrap;
         }
 
+        .serial-controls {
+            background: #2d2d2d;
+            padding: 1rem;
+            margin-top: 1rem;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+
         .btn {
             background: #4CAF50;
             border: none;
@@ -41,7 +50,6 @@
             border-radius: 5px;
             cursor: pointer;
             transition: background 0.3s;
-            font-size: 1rem;
         }
 
         .btn:hover {
@@ -53,9 +61,9 @@
             cursor: not-allowed;
         }
 
-        .btn-group {
-            display: flex;
-            gap: 0.5rem;
+        .serial-status {
+            color: #4CAF50;
+            margin-left: 1rem;
         }
 
         #chart-container {
@@ -73,49 +81,14 @@
             min-width: 200px;
         }
 
-        .status {
-            margin-top: 1rem;
-            text-align: center;
-            color: #888;
-        }
-
-        .volume-control {
+        .speed-control {
             display: flex;
             align-items: center;
             gap: 0.5rem;
         }
 
-        .volume-slider {
-            width: 100px;
-        }
-        .serial-controls {
-            background: #2d2d2d;
-            padding: 1rem;
-            margin-top: 1rem;
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-            flex-wrap: wrap;
-        }
-
-        .serial-status {
-            color: #4CAF50;
-            margin-left: 1rem;
-        }
-
-        .error-message {
-            color: #ff4444;
-            margin-top: 0.5rem;
-            text-align: center;
-        }
-
-        .debug-info {
-            background: #333;
-            padding: 1rem;
-            margin: 1rem;
-            border-radius: 5px;
-            font-family: monospace;
-            display: none;
+        .speed-value {
+            min-width: 60px;
         }
     </style>
 </head>
@@ -127,11 +100,7 @@
     <div class="serial-controls">
         <button id="connectBtn" class="btn">連接Arduino</button>
         <span id="serialStatus" class="serial-status">未連接</span>
-        <button id="toggleDebug" class="btn">顯示除錯訊息</button>
     </div>
-
-    <div id="debugInfo" class="debug-info"></div>
-    <div id="errorMessage" class="error-message"></div>
 
     <div class="controls">
         <select id="audioSelect" class="select">
@@ -147,10 +116,9 @@
             <button id="stopBtn" class="btn" disabled>停止</button>
         </div>
 
-        <div class="volume-control">
-            <span>音量</span>
-            <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="100">
-            <span id="volumeValue">100%</span>
+        <div class="speed-control">
+            <span>速度:</span>
+            <span id="speedValue" class="speed-value">1.0x</span>
         </div>
 
         <select id="modeSelect" class="select">
@@ -161,134 +129,88 @@
 
     <div id="chart-container"></div>
     
-    <div id="status" class="status">
-        請選擇音樂...
-    </div>
+    <div id="status" class="status">請選擇音樂...</div>
 
     <script>
-        let wave = null;
-        let isPlaying = false;
         let port;
         let reader;
         let keepReading = false;
-        let debugInfo = document.getElementById('debugInfo');
-        let errorMessage = document.getElementById('errorMessage');
-
-        function log(message) {
-            const timestamp = new Date().toLocaleTimeString();
-            debugInfo.innerHTML += `[${timestamp}] ${message}<br>`;
-            debugInfo.scrollTop = debugInfo.scrollHeight;
-            console.log(`[${timestamp}] ${message}`);
-        }
-
-        function showError(message) {
-            errorMessage.textContent = message;
-            log(`Error: ${message}`);
-        }
+        let currentSpeedPercent = 100;
 
         async function connectSerial() {
             try {
-                log('Requesting serial port...');
                 port = await navigator.serial.requestPort();
-                log('Port selected, attempting to open...');
+                await port.open({ baudRate: 9600 });
                 
-                await port.open({ 
-                    baudRate: 9600,
-                    dataBits: 8,
-                    stopBits: 1,
-                    parity: "none",
-                    bufferSize: 255,
-                    flowControl: "none"
-                });
-                
-                log('Port opened successfully');
                 const serialStatus = document.getElementById('serialStatus');
                 serialStatus.textContent = '已連接';
-                errorMessage.textContent = '';
                 
                 keepReading = true;
                 reader = port.readable.getReader();
-                log('Starting to read from serial port');
                 readSerial();
                 
                 document.getElementById('connectBtn').textContent = '中斷連接';
             } catch (err) {
-                showError(`連接失敗: ${err.message}`);
-                console.error('Detailed error:', err);
                 const serialStatus = document.getElementById('serialStatus');
                 serialStatus.textContent = '連接失敗';
             }
         }
 
+        async function disconnectSerial() {
+            if (reader) {
+                keepReading = false;
+                await reader.cancel();
+                await reader.releaseLock();
+            }
+            if (port) {
+                await port.close();
+            }
+            
+            const serialStatus = document.getElementById('serialStatus');
+            serialStatus.textContent = '未連接';
+            document.getElementById('connectBtn').textContent = '連接Arduino';
+        }
+
         async function readSerial() {
             let buffer = '';
-            
             while (port.readable && keepReading) {
                 try {
                     while (true) {
                         const { value, done } = await reader.read();
-                        if (done) {
-                            log('Reader signaled "done"');
-                            break;
-                        }
+                        if (done) break;
 
                         const textDecoder = new TextDecoder();
                         const chunk = textDecoder.decode(value);
                         buffer += chunk;
 
-                        // 尋找完整的行
                         const lines = buffer.split('\n');
-                        buffer = lines.pop() || ''; // 保留最後一個不完整的行
+                        buffer = lines.pop() || '';
 
                         for (let line of lines) {
                             line = line.trim();
                             if (line) {
                                 const sensorValue = parseInt(line);
                                 if (!isNaN(sensorValue)) {
-                                    log(`Received value: ${sensorValue}`);
-                                    volumeSlider.value = sensorValue;
-                                    volumeValue.textContent = `${sensorValue}%`;
-                                    if (wave) {
-                                        wave.setVolume(sensorValue / 100);
+                                    // 將感應器值轉換為播放速度（0.5x 到 2.0x）
+                                    const speed = 0.5 + (sensorValue / 100) * 1.5;
+                                    const roundedSpeed = Math.round(speed * 100) / 100;
+                                    
+                                    document.getElementById('speedValue').textContent = 
+                                        `${roundedSpeed.toFixed(2)}x`;
+                                    
+                                    if (wave && wave.sourceNode) {
+                                        wave.sourceNode.playbackRate.value = roundedSpeed;
                                     }
-                                } else {
-                                    log(`Invalid value received: ${line}`);
                                 }
                             }
                         }
                     }
                 } catch (error) {
-                    showError(`讀取錯誤: ${error.message}`);
                     break;
                 }
             }
         }
 
-        async function disconnectSerial() {
-            try {
-                if (reader) {
-                    log('Canceling reader...');
-                    keepReading = false;
-                    await reader.cancel();
-                    await reader.releaseLock();
-                    log('Reader canceled and released');
-                }
-                if (port) {
-                    log('Closing port...');
-                    await port.close();
-                    log('Port closed');
-                }
-                
-                const serialStatus = document.getElementById('serialStatus');
-                serialStatus.textContent = '未連接';
-                document.getElementById('connectBtn').textContent = '連接Arduino';
-                errorMessage.textContent = '';
-            } catch (err) {
-                showError(`斷開連接錯誤: ${err.message}`);
-            }
-        }
-
-        // 連接按鈕事件監聽器
         document.getElementById('connectBtn').addEventListener('click', async () => {
             if (port) {
                 await disconnectSerial();
@@ -297,122 +219,12 @@
             }
         });
 
-        // 切換除錯資訊顯示
-        document.getElementById('toggleDebug').addEventListener('click', () => {
-            debugInfo.style.display = debugInfo.style.display === 'none' ? 'block' : 'none';
-        });
-
-        // 檢查瀏覽器支援
         if (navigator.serial) {
-            log('Web Serial API supported');
+            console.log('Web Serial API supported');
         } else {
-            showError('此瀏覽器不支援 Web Serial API，請使用 Chrome 或 Edge');
             document.getElementById('connectBtn').disabled = true;
+            document.getElementById('serialStatus').textContent = '瀏覽器不支援Serial API';
         }
-        
-        const playBtn = document.getElementById('playBtn');
-        const pauseBtn = document.getElementById('pauseBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const audioSelect = document.getElementById('audioSelect');
-        const volumeSlider = document.getElementById('volumeSlider');
-        const volumeValue = document.getElementById('volumeValue');
-        const modeSelect = document.getElementById('modeSelect');
-        const status = document.getElementById('status');
-
-        function initVisualizer(mode = 'default') {
-            if (wave) {
-                wave.destroy();
-            }
-            wave = new CircularAudioWave(document.getElementById('chart-container'), {
-                mode: mode,
-                loop: false
-            });
-        }
-
-        async function loadAudio(audioUrl, displayName) {
-            status.textContent = '正在載入音樂...';
-            initVisualizer(modeSelect.value);
-            
-            try {
-                await wave.loadAudio(audioUrl);
-                status.textContent = `已載入: ${displayName}`;
-                playBtn.disabled = false;
-                pauseBtn.disabled = true;
-                stopBtn.disabled = false;
-            } catch (err) {
-                status.textContent = '載入音樂失敗';
-                console.error(err);
-            }
-        }
-
-        audioSelect.addEventListener('change', (e) => {
-            const selectedValue = e.target.value;
-            if (selectedValue) {
-                const displayName = e.target.options[e.target.selectedIndex].text;
-                loadAudio(selectedValue, displayName);
-            }
-        });
-
-        playBtn.addEventListener('click', () => {
-            if (wave && !isPlaying) {
-                wave.play();
-                isPlaying = true;
-                playBtn.disabled = true;
-                pauseBtn.disabled = false;
-                status.textContent = '播放中...';
-            }
-        });
-
-        pauseBtn.addEventListener('click', () => {
-            if (wave && isPlaying) {
-                wave.pause();
-                isPlaying = false;
-                playBtn.disabled = false;
-                pauseBtn.disabled = true;
-                status.textContent = '已暫停';
-            }
-        });
-
-        stopBtn.addEventListener('click', () => {
-            if (wave) {
-                wave.destroy();
-                initVisualizer(modeSelect.value);
-                isPlaying = false;
-                playBtn.disabled = false;
-                pauseBtn.disabled = true;
-                stopBtn.disabled = false;
-                status.textContent = '已停止';
-            }
-        });
-
-        volumeSlider.addEventListener('input', (e) => {
-            const value = e.target.value;
-            volumeValue.textContent = `${value}%`;
-            if (wave) {
-                wave.setVolume(value / 100);
-            }
-        });
-
-        modeSelect.addEventListener('change', (e) => {
-            const currentlyPlaying = isPlaying;
-            initVisualizer(e.target.value);
-            
-            const selectedAudio = audioSelect.value;
-            const displayName = audioSelect.options[audioSelect.selectedIndex].text;
-            
-            if (selectedAudio) {
-                loadAudio(selectedAudio, displayName).then(() => {
-                    if (currentlyPlaying) {
-                        wave.play();
-                        isPlaying = true;
-                        playBtn.disabled = true;
-                        pauseBtn.disabled = false;
-                    }
-                });
-            }
-        });
-
-        initVisualizer();
     </script>
 </body>
 </html>
