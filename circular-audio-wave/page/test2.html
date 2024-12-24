@@ -328,146 +328,139 @@
         const { useState } = React;
 
         function MultiBluetoothManager() {
-            
-            const [devices, setDevices] = useState({
-            speed: null,  // 控制速度的裝置
-            playlist: null  // 控制歌單的裝置
-        });
-        
-            const connectDevice = async (role) => {
-    try {
-        const port = await navigator.serial.requestPort();
-        await port.open({ baudRate: 9600 });
-        const reader = port.readable.getReader();
-        
-        setDevices(prev => ({
-            ...prev,
-            [role]: {
-                port,
-                reader,
-                value: 0,
-                role: role
-            }
-        }));
+    const [devices, setDevices] = useState({
+        speed: null,
+        playlist: null
+    });
 
-        readFromDevice(role, reader);
-    } catch (err) {
-        console.error('Connection failed:', err);
-    }
-};
-        
-            const readFromDevice = async (deviceId, reader) => {
-    let buffer = '';
-    while (true) {
+    const connectDevice = async (role) => {
         try {
-            const { value, done } = await reader.read();
-            if (done) break;
+            const port = await navigator.serial.requestPort();
+            await port.open({ baudRate: 9600 });
+            const reader = port.readable.getReader();
+            
+            setDevices(prev => ({
+                ...prev,
+                [role]: {
+                    port,
+                    reader,
+                    value: 0
+                }
+            }));
 
-            const chunk = new TextDecoder().decode(value);
-            buffer += chunk;
+            readFromDevice(role, reader);
+        } catch (err) {
+            console.error('Connection failed:', err);
+        }
+    };
 
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
+    const disconnectDevice = async (role) => {
+        const device = devices[role];
+        if (device) {
+            try {
+                await device.reader.cancel();
+                await device.port.close();
+                setDevices(prev => ({
+                    ...prev,
+                    [role]: null
+                }));
+            } catch (err) {
+                console.error('Disconnect failed:', err);
+            }
+        }
+    };
 
-            for (const line of lines) {
-                const sensorValue = parseInt(line.trim());
-                if (!isNaN(sensorValue)) {
-                    console.log('Sensor value:', sensorValue); // 追蹤感應器值
-                    setDevices(prev => {
-                        const newDevices = new Map(prev);
-                        const device = newDevices.get(deviceId);
-                        if (device) {
-                            device.value = sensorValue;
-                            device.speed = 2 - (sensorValue / 100);
-                            console.log('Speed calculated:', device.speed); // 追蹤計算的速度
+    const readFromDevice = async (role, reader) => {
+        let buffer = '';
+        while (true) {
+            try {
+                const { value, done } = await reader.read();
+                if (done) break;
+
+                const chunk = new TextDecoder().decode(value);
+                buffer += chunk;
+
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    const sensorValue = parseInt(line.trim());
+                    if (!isNaN(sensorValue)) {
+                        setDevices(prev => {
+                            const device = prev[role];
+                            return {
+                                ...prev,
+                                [role]: {
+                                    ...device,
+                                    value: sensorValue,
+                                    speed: role === 'speed' ? 2 - (sensorValue / 100) : device.speed
+                                }
+                            };
+                        });
+                        
+                        if (role === 'speed' && window.wave?.sourceNode) {
+                            window.wave.sourceNode.playbackRate.value = 2 - (sensorValue / 100);
+                        } else if (role === 'playlist') {
+                            // 控制歌單邏輯
+                            handlePlaylistControl(sensorValue);
                         }
-                        return newDevices;
-                    });
-                    
-                    // 直接設定播放速度
-                    if (window.wave && window.wave.sourceNode) {
-                        console.log('Setting playback rate'); // 追蹤是否執行設定
-                        window.wave.sourceNode.playbackRate.value = 2 - (sensorValue / 100);
                     }
                 }
+            } catch (error) {
+                console.error('Read error:', error);
+                break;
             }
-        } catch (error) {
-            console.error('Read error:', error); // 追蹤錯誤
-            break;
         }
-    }
-};
-        
-            const disconnectDevice = async (deviceId) => {
-                const device = devices.get(deviceId);
-                if (device) {
-                    await device.reader.cancel();
-                    await device.port.close();
-                    setDevices(prev => {
-                        const newDevices = new Map(prev);
-                        newDevices.delete(deviceId);
-                        return newDevices;
-                    });
-                }
-            };
-        
-            const updateGlobalSpeed = () => {
-                const speeds = Array.from(devices.values())
-                    .map(d => d.speed || 1);
-                const avgSpeed = speeds.length ? 
-                    speeds.reduce((a, b) => a + b) / speeds.length : 1;
-                
-                const roundedSpeed = Math.round(avgSpeed * 100) / 100;
-                
-                const speedValue = document.getElementById('speedValue');
-                if (speedValue) {
-                    speedValue.textContent = `${roundedSpeed.toFixed(2)}x`;
-                }
-                
-                if (window.wave && window.wave.sourceNode) {
-                    window.wave.sourceNode.playbackRate.value = roundedSpeed;
-                }
-            };
-        
-            return (
-                <div className="p-4">
-        <div className="flex gap-4 mb-4">
-            <button 
-                onClick={() => connectDevice('speed')}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
-            >
-                連接速度控制器
-            </button>
-            <button 
-                onClick={() => connectDevice('playlist')}
-                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
-            >
-                連接歌單控制器
-            </button>
+    };
+
+    const handlePlaylistControl = (value) => {
+        const audioSelect = document.getElementById('audioSelect');
+        if (audioSelect) {
+            const optionCount = audioSelect.options.length - 1;
+            const selectedIndex = Math.floor((value / 100) * optionCount) + 1;
+            audioSelect.selectedIndex = selectedIndex;
+            audioSelect.dispatchEvent(new Event('change'));
+        }
+    };
+
+    return (
+        <div className="p-4">
+            <div className="flex gap-4 mb-4">
+                <button 
+                    onClick={() => connectDevice('speed')}
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+                >
+                    連接速度控制器
+                </button>
+                <button 
+                    onClick={() => connectDevice('playlist')}
+                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
+                >
+                    連接歌單控制器
+                </button>
+            </div>
+            
+            {Object.entries(devices).map(([role, device]) => 
+                device && (
+                    <div key={role} className="bg-gray-700 p-3 rounded mb-2">
+                        <div className="text-white">
+                            {role === 'speed' ? '速度控制器' : '歌單控制器'}
+                        </div>
+                        <div className="text-gray-300">
+                            值: {device.value}
+                        </div>
+                        <button 
+                            onClick={() => disconnectDevice(role)}
+                            className="text-red-400"
+                        >
+                            中斷
+                        </button>
+                    </div>
+                )
+            )}
         </div>
-        
-        {/* 顯示已連接裝置 */}
-        {Object.entries(devices).map(([role, device]) => 
-            device && (
-                <div key={role} className="bg-gray-700 p-3 rounded mb-2">
-                    <div className="text-white">
-                        {role === 'speed' ? '速度控制器' : '歌單控制器'}
-                    </div>
-                    <div className="text-gray-300">
-                        值: {device.value}
-                    </div>
-                    <button 
-                        onClick={() => disconnectDevice(role)}
-                        className="text-red-400"
-                    >
-                        中斷
-                    </button>
-                </div>
-            )
-        )}
-    </div>
-            );
-        }
+    );
+}
 
         window.onload = function() {
     // 找到 ID 為 serial-controls 的 HTML 元素
