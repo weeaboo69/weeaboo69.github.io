@@ -431,33 +431,41 @@
         
             return (
                 <div className="p-4">
-                    <div className="flex items-center gap-4 mb-4">
-                        <button
-                            onClick={connectDevice}
-                            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2"
-                        >
-                            <span>＋</span> 新增裝置
-                        </button>
-                        <div className="text-green-400">已連接裝置: {devices.size}</div>
+        <div className="flex gap-4 mb-4">
+            <button 
+                onClick={() => connectDevice('speed')}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+            >
+                連接速度控制器
+            </button>
+            <button 
+                onClick={() => connectDevice('playlist')}
+                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
+            >
+                連接歌單控制器
+            </button>
+        </div>
+        
+        {/* 顯示已連接裝置 */}
+        {Object.entries(devices).map(([role, device]) => 
+            device && (
+                <div key={role} className="bg-gray-700 p-3 rounded mb-2">
+                    <div className="text-white">
+                        {role === 'speed' ? '速度控制器' : '歌單控制器'}
                     </div>
-                    
-                    <div className="space-y-2">
-                        {Array.from(devices).map(([id, device]) => (
-                            <div key={id} className="flex items-center justify-between bg-gray-700 p-3 rounded">
-                                <div className="text-sm">
-                                    <div className="text-white">裝置 {id.slice(-4)}</div>
-                                    <div className="text-gray-300">速度: {device.speed ? device.speed.toFixed(2) : '1.00'}x</div>
-                                </div>
-                                <button
-                                    onClick={() => disconnectDevice(id)}
-                                    className="text-red-400 hover:text-red-300"
-                                >
-                                    中斷
-                                </button>
-                            </div>
-                        ))}
+                    <div className="text-gray-300">
+                        值: {device.value}
                     </div>
+                    <button 
+                        onClick={() => disconnectDevice(role)}
+                        className="text-red-400"
+                    >
+                        中斷
+                    </button>
                 </div>
+            )
+        )}
+    </div>
             );
         }
 
