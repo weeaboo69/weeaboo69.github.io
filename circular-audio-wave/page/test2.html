@@ -356,39 +356,46 @@
             };
         
             const readFromDevice = async (deviceId, reader) => {
-                let buffer = '';
-                while (true) {
-                    try {
-                        const { value, done } = await reader.read();
-                        if (done) break;
-        
-                        const chunk = new TextDecoder().decode(value);
-                        buffer += chunk;
-        
-                        const lines = buffer.split('\n');
-                        buffer = lines.pop() || '';
-        
-                        for (const line of lines) {
-                            const sensorValue = parseInt(line.trim());
-                            if (!isNaN(sensorValue)) {
-                                setDevices(prev => {
-                                    const newDevices = new Map(prev);
-                                    const device = newDevices.get(deviceId);
-                                    if (device) {
-                                        device.value = sensorValue;
-                                        device.speed = 2 - (sensorValue / 100);
-                                    }
-                                    return newDevices;
-                                });
-                                
-                                updateGlobalSpeed();
-                            }
+    let buffer = '';
+    while (true) {
+        try {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            const chunk = new TextDecoder().decode(value);
+            buffer += chunk;
+
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                const sensorValue = parseInt(line.trim());
+                if (!isNaN(sensorValue)) {
+                    console.log('Sensor value:', sensorValue); // 追蹤感應器值
+                    setDevices(prev => {
+                        const newDevices = new Map(prev);
+                        const device = newDevices.get(deviceId);
+                        if (device) {
+                            device.value = sensorValue;
+                            device.speed = 2 - (sensorValue / 100);
+                            console.log('Speed calculated:', device.speed); // 追蹤計算的速度
                         }
-                    } catch (error) {
-                        break;
+                        return newDevices;
+                    });
+                    
+                    // 直接設定播放速度
+                    if (window.wave && window.wave.sourceNode) {
+                        console.log('Setting playback rate'); // 追蹤是否執行設定
+                        window.wave.sourceNode.playbackRate.value = 2 - (sensorValue / 100);
                     }
                 }
-            };
+            }
+        } catch (error) {
+            console.error('Read error:', error); // 追蹤錯誤
+            break;
+        }
+    }
+};
         
             const disconnectDevice = async (deviceId) => {
                 const device = devices.get(deviceId);
