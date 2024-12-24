@@ -173,7 +173,7 @@
         <h1>謀聲</h1>
     </div>
 
-    <div id="serial-controls"></div>
+    <div id="serial-controls">載入中...</div>
 
     <div id="debugInfo" class="debug-info"></div>
     <div id="errorMessage" class="error-message"></div>
@@ -453,14 +453,16 @@
             );
         }
 
-        document.addEventListener('DOMContentLoaded', function() {
-            const container = document.getElementById('serial-controls');
-            if (container) {
-                ReactDOM.createRoot(container).render(<MultiBluetoothManager />);
-            } else {
-                console.error('serial-controls element not found');
-            }
-        });
+        window.onload = function() {
+    // 找到 ID 為 serial-controls 的 HTML 元素
+    const container = document.getElementById('serial-controls');
+    if (container) {
+        // 在找到的元素中渲染 React 元件
+        ReactDOM.createRoot(container).render(<MultiBluetoothManager />);
+    } else {
+        console.error('Container not found');
+    }
+}
     </script>
 </body>
 </html>
