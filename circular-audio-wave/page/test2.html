@@ -398,7 +398,7 @@
                             };
                         });
                         
-                        if (role === 'speed' && window.wave?.sourceNode) {
+                        if (role === 'speed' && window.wave && window.wave.sourceNode) {
                             window.wave.sourceNode.playbackRate.value = 2 - (sensorValue / 100);
                         } else if (role === 'playlist') {
                             // 控制歌單邏輯
@@ -462,16 +462,14 @@
     );
 }
 
-        window.onload = function() {
-    // 找到 ID 為 serial-controls 的 HTML 元素
-    const container = document.getElementById('serial-controls');
-    if (container) {
-        // 在找到的元素中渲染 React 元件
-        ReactDOM.createRoot(container).render(<MultiBluetoothManager />);
-    } else {
-        console.error('Container not found');
+    window.onload = function() {
+        const container = document.getElementById('serial-controls');
+        if (container) {
+            ReactDOM.createRoot(container).render(<MultiBluetoothManager />);
+        } else {
+            console.error('Container not found');
+        }
     }
-}
     </script>
 </body>
 </html>
