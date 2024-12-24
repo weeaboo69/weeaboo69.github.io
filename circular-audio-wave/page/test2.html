@@ -314,6 +314,12 @@
             }
         });
 
+        document.addEventListener('click', function() {
+            if (window.wave && window.wave.context && window.wave.context.state === 'suspended') {
+            window.wave.context.resume();
+            }
+        });
+
         initVisualizer();
     </script>
 
@@ -410,7 +416,7 @@
                     speedValue.textContent = `${roundedSpeed.toFixed(2)}x`;
                 }
                 
-                if (window.wave?.sourceNode) {
+                if (window.wave && window.wave.sourceNode) {
                     window.wave.sourceNode.playbackRate.value = roundedSpeed;
                 }
             };
