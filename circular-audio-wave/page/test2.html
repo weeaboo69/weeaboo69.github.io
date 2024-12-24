@@ -325,35 +325,35 @@
 
     <!-- React Component -->
     <script type="text/babel">
+        const [devices, setDevices] = useState({
+            speed: null,  // 控制速度的裝置
+            playlist: null  // 控制歌單的裝置
+        });
         const { useState } = React;
 
         function MultiBluetoothManager() {
             const [devices, setDevices] = useState(new Map());
         
-            const connectDevice = async () => {
-                try {
-                    const port = await navigator.serial.requestPort();
-                    await port.open({ baudRate: 9600 });
-                    
-                    const deviceId = `device-${Date.now()}`;
-                    const reader = port.readable.getReader();
-                    
-                    setDevices(prev => {
-                        const newDevices = new Map(prev);
-                        newDevices.set(deviceId, {
-                            port,
-                            reader,
-                            status: 'connected',
-                            value: 0
-                        });
-                        return newDevices;
-                    });
-        
-                    readFromDevice(deviceId, reader);
-                } catch (err) {
-                    console.error('Connection failed:', err);
-                }
-            };
+            const connectDevice = async (role) => {
+  try {
+    const port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 9600 });
+    const reader = port.readable.getReader();
+    
+    setDevices(prev => ({
+      ...prev,
+      [role]: {
+        port,
+        reader,
+        value: 0
+      }
+    }));
+
+    readFromDevice(role, reader);
+  } catch (err) {
+    console.error('Connection failed:', err);
+  }
+};
         
             const readFromDevice = async (deviceId, reader) => {
     let buffer = '';
