@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Visualizer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+    <script src="../src/js/circular-audio-wave.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: #2d2d2d;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .controls {
+            background: #2d2d2d;
+            padding: 1rem;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-size: 1rem;
+        }
+
+        .btn:hover {
+            background: #45a049;
+        }
+
+        .btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        #chart-container {
+            flex: 1;
+            min-height: 500px;
+            padding: 1rem;
+        }
+
+        .select {
+            padding: 10px;
+            border-radius: 5px;
+            background: #333;
+            color: white;
+            border: 1px solid #444;
+            min-width: 200px;
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .speed-value {
+            min-width: 60px;
+        }
+
+        .serial-controls {
+    background: #2d2d2d;
+    padding: 1rem;
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    align-items: center;
+}
+
+.serial-status {
+    color: #4CAF50;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    background: rgba(76, 175, 80, 0.1);
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    font-size: 0.9rem;
+}
+
+/* 連接按鈕特殊樣式 */
+.connect-btn {
+    background: #2196F3;
+    color: white;
+    padding: 8px 20px;
+    border-radius: 20px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.connect-btn:hover {
+    background: #1976D2;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.connect-btn:active {
+    transform: translateY(1px);
+}
+
+.connect-btn.connected {
+    background: #4CAF50;
+}
+
+.connect-btn.connected:hover {
+    background: #388E3C;
+}
+
+.connect-btn:disabled {
+    background: #9e9e9e;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* 添加連接圖標 */
+.connect-btn::before {
+    content: "⚡";
+    font-size: 1.1em;
+}
+
+.connect-btn.connected::before {
+    content: "✓";
+}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>謀聲</h1>
+    </div>
+
+    <div id="serial-controls"></div>
+
+    <div id="debugInfo" class="debug-info"></div>
+    <div id="errorMessage" class="error-message"></div>
+
+    <div class="controls">
+        <select id="audioSelect" class="select">
+            <option value="">選擇預設音樂</option>
+            <option value="audio/audio1.mp3">歌曲 1</option>
+            <option value="audio/屋頂.mp3">歌曲 2</option>
+            <option value="audio/想約.wav">歌曲 3</option>
+        </select>
+        
+        <div class="btn-group">
+            <button id="playBtn" class="btn" disabled>播放</button>
+            <button id="pauseBtn" class="btn" disabled>暫停</button>
+            <button id="stopBtn" class="btn" disabled>停止</button>
+        </div>
+
+        <div class="speed-control">
+            <span>速度:</span>
+            <span id="speedValue" class="speed-value">1.0x</span>
+        </div>
+
+        <select id="modeSelect" class="select">
+            <option value="default">默認波形</option>
+            <option value="sunburst">太陽爆發效果</option>
+        </select>
+    </div>
+
+    <div id="chart-container"></div>
+    
+    <div id="status" class="status">
+        請選擇音樂...
+    </div>
+
+    <script>
+        let wave = null;
+        let isPlaying = false;
+        let currentSpeedPercent = 100;
+        window.wave = null; // Make wave accessible globally
+
+        const playBtn = document.getElementById('playBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const audioSelect = document.getElementById('audioSelect');
+        const modeSelect = document.getElementById('modeSelect');
+        const status = document.getElementById('status');
+
+        function initVisualizer(mode = 'default') {
+            if (wave) {
+                wave.destroy();
+            }
+            wave = new CircularAudioWave(document.getElementById('chart-container'), {
+                mode: mode,
+                loop: false
+            });
+            window.wave = wave; // Update global reference
+        }
+
+        async function loadAudio(audioUrl, displayName) {
+            status.textContent = '正在載入音樂...';
+            initVisualizer(modeSelect.value);
+            
+            try {
+                await wave.loadAudio(audioUrl);
+                status.textContent = `已載入: ${displayName}`;
+                playBtn.disabled = false;
+                pauseBtn.disabled = true;
+                stopBtn.disabled = false;
+            } catch (err) {
+                status.textContent = '載入音樂失敗';
+                console.error(err);
+            }
+        }
+
+        // Event listeners remain the same
+        audioSelect.addEventListener('change', (e) => {
+            const selectedValue = e.target.value;
+            if (selectedValue) {
+                const displayName = e.target.options[e.target.selectedIndex].text;
+                loadAudio(selectedValue, displayName);
+            }
+        });
+
+        playBtn.addEventListener('click', () => {
+            if (wave && !isPlaying) {
+                wave.play();
+                isPlaying = true;
+                playBtn.disabled = true;
+                pauseBtn.disabled = false;
+                status.textContent = '播放中...';
+            }
+        });
+
+        pauseBtn.addEventListener('click', () => {
+            if (wave && isPlaying) {
+                wave.pause();
+                isPlaying = false;
+                playBtn.disabled = false;
+                pauseBtn.disabled = true;
+                status.textContent = '已暫停';
+            }
+        });
+
+        stopBtn.addEventListener('click', () => {
+            if (wave) {
+                wave.destroy();
+                initVisualizer(modeSelect.value);
+                isPlaying = false;
+                playBtn.disabled = false;
+                pauseBtn.disabled = true;
+                stopBtn.disabled = false;
+                status.textContent = '已停止';
+            }
+        });
+
+        modeSelect.addEventListener('change', (e) => {
+            const currentlyPlaying = isPlaying;
+            initVisualizer(e.target.value);
+            
+            const selectedAudio = audioSelect.value;
+            const displayName = audioSelect.options[audioSelect.selectedIndex].text;
+            
+            if (selectedAudio) {
+                loadAudio(selectedAudio, displayName).then(() => {
+                    if (currentlyPlaying) {
+                        wave.play();
+                        isPlaying = true;
+                        playBtn.disabled = true;
+                        pauseBtn.disabled = false;
+                    }
+                });
+            }
+        });
+
+        initVisualizer();
+    </script>
+
+    <script type="text/babel">
+        const MultiBluetoothManager = () => {
+            const [devices, setDevices] = useState(new Map());
+        
+            const connectDevice = async () => {
+                try {
+                    const port = await navigator.serial.requestPort();
+                    await port.open({ baudRate: 9600 });
+                    
+                    const deviceId = `device-${Date.now()}`;
+                    const reader = port.readable.getReader();
+                    
+                    setDevices(prev => {
+                        const newDevices = new Map(prev);
+                        newDevices.set(deviceId, {
+                            port,
+                            reader,
+                            status: 'connected',
+                            value: 0
+                        });
+                        return newDevices;
+                    });
+        
+                    readFromDevice(deviceId, reader);
+                } catch (err) {
+                    console.error('Connection failed:', err);
+                }
+            };
+        
+            const readFromDevice = async (deviceId, reader) => {
+                let buffer = '';
+                while (true) {
+                    try {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+        
+                        const chunk = new TextDecoder().decode(value);
+                        buffer += chunk;
+        
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || '';
+        
+                        for (const line of lines) {
+                            const sensorValue = parseInt(line.trim());
+                            if (!isNaN(sensorValue)) {
+                                setDevices(prev => {
+                                    const newDevices = new Map(prev);
+                                    const device = newDevices.get(deviceId);
+                                    if (device) {
+                                        device.value = sensorValue;
+                                        device.speed = 2 - (sensorValue / 100);
+                                    }
+                                    return newDevices;
+                                });
+                                
+                                updateGlobalSpeed();
+                            }
+                        }
+                    } catch (error) {
+                        break;
+                    }
+                }
+            };
+        
+            const disconnectDevice = async (deviceId) => {
+                const device = devices.get(deviceId);
+                if (device) {
+                    await device.reader.cancel();
+                    await device.port.close();
+                    setDevices(prev => {
+                        const newDevices = new Map(prev);
+                        newDevices.delete(deviceId);
+                        return newDevices;
+                    });
+                }
+            };
+        
+            const updateGlobalSpeed = () => {
+                const speeds = Array.from(devices.values())
+                    .map(d => d.speed || 1);
+                const avgSpeed = speeds.length ? 
+                    speeds.reduce((a, b) => a + b) / speeds.length : 1;
+                
+                const roundedSpeed = Math.round(avgSpeed * 100) / 100;
+                
+                const speedValue = document.getElementById('speedValue');
+                if (speedValue) {
+                    speedValue.textContent = `${roundedSpeed.toFixed(2)}x`;
+                }
+                
+                if (window.wave?.sourceNode) {
+                    window.wave.sourceNode.playbackRate.value = roundedSpeed;
+                }
+            };
+        
+            return (
+                <div className="p-4">
+                    <div className="flex items-center gap-4 mb-4">
+                        <button
+                            onClick={connectDevice}
+                            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2"
+                        >
+                            <span>＋</span> 新增裝置
+                        </button>
+                        <div className="text-green-400">已連接裝置: {devices.size}</div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                        {Array.from(devices).map(([id, device]) => (
+                            <div key={id} className="flex items-center justify-between bg-gray-700 p-3 rounded">
+                                <div className="text-sm">
+                                    <div className="text-white">裝置 {id.slice(-4)}</div>
+                                    <div className="text-gray-300">速度: {device.speed?.toFixed(2)}x</div>
+                                </div>
+                                <button
+                                    onClick={() => disconnectDevice(id)}
+                                    className="text-red-400 hover:text-red-300"
+                                >
+                                    中斷
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.createRoot(document.getElementById('serial-controls'))
+               .render(<MultiBluetoothManager />);
+    </script>
+</body>
+</html>
