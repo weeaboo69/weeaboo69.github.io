@@ -362,7 +362,7 @@
 
             readFromDevice(role, reader);
         } catch (err) {
-            console.error('Connection failed:', err);
+            console.error('連接失敗:', err);
         }
     };
 
@@ -377,7 +377,7 @@
                     [role]: null
                 }));
             } catch (err) {
-                console.error('Disconnect failed:', err);
+                console.error('斷開連接失敗:', err);
             }
         }
     };
@@ -396,42 +396,48 @@
                 buffer = lines.pop() || '';
 
                 for (const line of lines) {
-                    const sensorValue = parseInt(line.trim());
-                    if (!isNaN(sensorValue)) {
-                        setDevices(prev => {
-                            const device = prev[role];
-                            return {
+                    const trimmedLine = line.trim();
+                    
+                    // 速度控制器
+                    if (role === 'speed') {
+                        const sensorValue = parseInt(trimmedLine);
+                        if (!isNaN(sensorValue)) {
+                            setDevices(prev => ({
                                 ...prev,
-                                [role]: {
-                                    ...device,
-                                    value: sensorValue,
-                                    speed: role === 'speed' ? 2 - (sensorValue / 100) : device.speed
+                                speed: {
+                                    ...prev.speed,
+                                    value: sensorValue
                                 }
-                            };
-                        });
-                        
-                        if (role === 'speed' && window.wave && window.wave.sourceNode) {
-                            window.wave.sourceNode.playbackRate.value = 2 - (sensorValue / 100);
-                        } else if (role === 'playlist') {
-                            // 控制歌單邏輯
-                            handlePlaylistControl(sensorValue);
+                            }));
+                            
+                            if (window.wave && window.wave.sourceNode) {
+                                // 調整播放速度
+                                window.wave.sourceNode.playbackRate.value = 2 - (sensorValue / 100);
+                            }
+                        }
+                    } 
+                    
+                    // 歌單控制器
+                    else if (role === 'playlist') {
+                        if (trimmedLine === 'SELECT_MUSIC_2') {
+                            const audioSelect = document.getElementById('audioSelect');
+                            if (audioSelect) {
+                                audioSelect.selectedIndex = 2; // 選擇第二首歌
+                                audioSelect.dispatchEvent(new Event('change'));
+                            }
+                        } else if (trimmedLine === 'SELECT_MUSIC_3') {
+                            const audioSelect = document.getElementById('audioSelect');
+                            if (audioSelect) {
+                                audioSelect.selectedIndex = 3; // 選擇第三首歌
+                                audioSelect.dispatchEvent(new Event('change'));
+                            }
                         }
                     }
                 }
             } catch (error) {
-                console.error('Read error:', error);
+                console.error('讀取錯誤:', error);
                 break;
             }
-        }
-    };
-
-    const handlePlaylistControl = (value) => {
-        const audioSelect = document.getElementById('audioSelect');
-        if (audioSelect) {
-            const optionCount = audioSelect.options.length - 1;
-            const selectedIndex = Math.floor((value / 100) * optionCount) + 1;
-            audioSelect.selectedIndex = selectedIndex;
-            audioSelect.dispatchEvent(new Event('change'));
         }
     };
 
@@ -472,7 +478,64 @@
             )}
         </div>
     );
-}
+}const readFromDevice = async (role, reader) => {
+        let buffer = '';
+        while (true) {
+            try {
+                const { value, done } = await reader.read();
+                if (done) break;
+
+                const chunk = new TextDecoder().decode(value);
+                buffer += chunk;
+
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    const trimmedLine = line.trim();
+                    
+                    if (role === 'playlist') {
+                        // Handle specific music selection messages
+                        if (trimmedLine === 'SELECT_MUSIC_2') {
+                            const audioSelect = document.getElementById('audioSelect');
+                            if (audioSelect) {
+                                audioSelect.selectedIndex = 2; // Second option (index 1)
+                                audioSelect.dispatchEvent(new Event('change'));
+                            }
+                        } else if (trimmedLine === 'SELECT_MUSIC_3') {
+                            const audioSelect = document.getElementById('audioSelect');
+                            if (audioSelect) {
+                                audioSelect.selectedIndex = 3; // Third option (index 2)
+                                audioSelect.dispatchEvent(new Event('change'));
+                            }
+                        }
+                    } else if (role === 'speed') {
+                        const sensorValue = parseInt(trimmedLine);
+                        if (!isNaN(sensorValue)) {
+                            setDevices(prev => {
+                                const device = prev[role];
+                                return {
+                                    ...prev,
+                                    [role]: {
+                                        ...device,
+                                        value: sensorValue,
+                                        speed: 2 - (sensorValue / 100)
+                                    }
+                                };
+                            });
+                            
+                            if (window.wave && window.wave.sourceNode) {
+                                window.wave.sourceNode.playbackRate.value = 2 - (sensorValue / 100);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Read error:', error);
+                break;
+            }
+        }
+    };
 
     window.onload = function() {
         const container = document.getElementById('serial-controls');
