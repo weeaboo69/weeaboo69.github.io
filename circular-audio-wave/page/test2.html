@@ -229,313 +229,287 @@
     <!-- Main Scripts -->
     <script>
         let wave = null;
-        let isPlaying = false;
-        let currentSpeedPercent = 100;
-        window.wave = null;
+let isPlaying = false;
+let currentSpeedPercent = 100;
+window.wave = null;
 
-        const playBtn = document.getElementById('playBtn');
-        const pauseBtn = document.getElementById('pauseBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const audioSelect = document.getElementById('audioSelect');
-        const modeSelect = document.getElementById('modeSelect');
-        const status = document.getElementById('status');
+const playBtn = document.getElementById('playBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const stopBtn = document.getElementById('stopBtn');
+const audioSelect = document.getElementById('audioSelect');
+const modeSelect = document.getElementById('modeSelect');
+const status = document.getElementById('status');
 
-        function initVisualizer(mode = 'default') {
-            if (wave) {
-                wave.destroy();
-            }
-            wave = new CircularAudioWave(document.getElementById('chart-container'), {
-                mode: mode,
-                loop: false
-            });
-            window.wave = wave;
-        }
+function initVisualizer(mode = 'default') {
+    if (wave) {
+        wave.destroy();
+    }
+    wave = new CircularAudioWave(document.getElementById('chart-container'), {
+        mode: mode,
+        loop: false
+    });
+    window.wave = wave;
+}
 
-        async function loadAudio(audioUrl, displayName) {
-            status.textContent = '正在載入音樂...';
-            initVisualizer(modeSelect.value);
-            
-            try {
-                await wave.loadAudio(audioUrl);
-                status.textContent = `已載入: ${displayName}`;
-                playBtn.disabled = false;
-                pauseBtn.disabled = true;
-                stopBtn.disabled = false;
-            } catch (err) {
-                status.textContent = '載入音樂失敗';
-                console.error(err);
-            }
-        }
+function stopMusic() {
+    if (wave && isPlaying) {
+        wave.destroy();
+        initVisualizer(modeSelect.value);
+        isPlaying = false;
+        playBtn.disabled = false;
+        pauseBtn.disabled = true;
+        stopBtn.disabled = false;
+        status.textContent = '已停止';
+    }
+}
 
-        audioSelect.addEventListener('change', (e) => {
-            const selectedValue = e.target.value;
-            if (selectedValue) {
-                const displayName = e.target.options[e.target.selectedIndex].text;
-                loadAudio(selectedValue, displayName);
-            }
-        });
+function playMusic() {
+    if (wave && !isPlaying) {
+        wave.play();
+        isPlaying = true;
+        playBtn.disabled = true;
+        pauseBtn.disabled = false;
+        stopBtn.disabled = false;
+        status.textContent = '播放中...';
+    }
+}
 
-        playBtn.addEventListener('click', () => {
-            if (wave && !isPlaying) {
+async function loadAudio(audioUrl, displayName) {
+    status.textContent = '正在載入音樂...';
+    initVisualizer(modeSelect.value);
+    
+    try {
+        await wave.loadAudio(audioUrl);
+        status.textContent = `已載入: ${displayName}`;
+        playBtn.disabled = false;
+        pauseBtn.disabled = true;
+        stopBtn.disabled = false;
+    } catch (err) {
+        status.textContent = '載入音樂失敗';
+        console.error(err);
+    }
+}
+
+audioSelect.addEventListener('change', (e) => {
+    const selectedValue = e.target.value;
+    if (selectedValue) {
+        const displayName = e.target.options[e.target.selectedIndex].text;
+        loadAudio(selectedValue, displayName);
+    }
+});
+
+playBtn.addEventListener('click', playMusic);
+
+pauseBtn.addEventListener('click', () => {
+    if (wave && isPlaying) {
+        wave.pause();
+        isPlaying = false;
+        playBtn.disabled = false;
+        pauseBtn.disabled = true;
+        status.textContent = '已暫停';
+    }
+});
+
+stopBtn.addEventListener('click', stopMusic);
+
+modeSelect.addEventListener('change', (e) => {
+    const currentlyPlaying = isPlaying;
+    initVisualizer(e.target.value);
+    
+    const selectedAudio = audioSelect.value;
+    const displayName = audioSelect.options[audioSelect.selectedIndex].text;
+    
+    if (selectedAudio) {
+        loadAudio(selectedAudio, displayName).then(() => {
+            if (currentlyPlaying) {
                 wave.play();
                 isPlaying = true;
                 playBtn.disabled = true;
                 pauseBtn.disabled = false;
-                status.textContent = '播放中...';
             }
         });
+    }
+});
 
-        pauseBtn.addEventListener('click', () => {
-            if (wave && isPlaying) {
-                wave.pause();
-                isPlaying = false;
-                playBtn.disabled = false;
-                pauseBtn.disabled = true;
-                status.textContent = '已暫停';
-            }
-        });
+document.addEventListener('click', function() {
+    if (window.wave && window.wave.context && window.wave.context.state === 'suspended') {
+        window.wave.context.resume();
+    }
+});
 
-        stopBtn.addEventListener('click', () => {
-            if (wave) {
-                wave.destroy();
-                initVisualizer(modeSelect.value);
-                isPlaying = false;
-                playBtn.disabled = false;
-                pauseBtn.disabled = true;
-                stopBtn.disabled = false;
-                status.textContent = '已停止';
-            }
-        });
-
-        modeSelect.addEventListener('change', (e) => {
-            const currentlyPlaying = isPlaying;
-            initVisualizer(e.target.value);
-            
-            const selectedAudio = audioSelect.value;
-            const displayName = audioSelect.options[audioSelect.selectedIndex].text;
-            
-            if (selectedAudio) {
-                loadAudio(selectedAudio, displayName).then(() => {
-                    if (currentlyPlaying) {
-                        wave.play();
-                        isPlaying = true;
-                        playBtn.disabled = true;
-                        pauseBtn.disabled = false;
-                    }
-                });
-            }
-        });
-
-        document.addEventListener('click', function() {
-            if (window.wave && window.wave.context && window.wave.context.state === 'suspended') {
-            window.wave.context.resume();
-            }
-        });
-
-        initVisualizer();
+initVisualizer();
     </script>
 
     <!-- React Component -->
-    <script type="text/babel">
-        const { useState } = React;
+<script type="text/babel">
+    const { useState } = React;
 
-        function MultiBluetoothManager() {
-    const [devices, setDevices] = useState({
-        speed: null,
-        playlist: null
-    });
+    function MultiBluetoothManager() {
+        const [devices, setDevices] = useState({
+            speed: null,
+            playlist: null
+        });
 
-    const connectDevice = async (role) => {
-        try {
-            const port = await navigator.serial.requestPort();
-            await port.open({ baudRate: 9600 });
-            const reader = port.readable.getReader();
-            
-            setDevices(prev => ({
-                ...prev,
-                [role]: {
-                    port,
-                    reader,
-                    value: 0
-                }
-            }));
-
-            readFromDevice(role, reader);
-        } catch (err) {
-            console.error('連接失敗:', err);
-        }
-    };
-
-    const disconnectDevice = async (role) => {
-        const device = devices[role];
-        if (device) {
+        const connectDevice = async (role) => {
             try {
-                await device.reader.cancel();
-                await device.port.close();
+                const port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 9600 });
+                const reader = port.readable.getReader();
+                
                 setDevices(prev => ({
                     ...prev,
-                    [role]: null
+                    [role]: {
+                        port,
+                        reader,
+                        value: 0
+                    }
                 }));
+
+                readFromDevice(role, reader);
             } catch (err) {
-                console.error('斷開連接失敗:', err);
+                console.error('連接失敗:', err);
             }
-        }
-    };
+        };
 
-    const readFromDevice = async (role, reader) => {
-        let buffer = '';
-        while (true) {
-            try {
-                const { value, done } = await reader.read();
-                if (done) break;
-
-                const chunk = new TextDecoder().decode(value);
-                buffer += chunk;
-
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
-
-                for (const line of lines) {
-                    const trimmedLine = line.trim();
-                    
-                    // 速度控制器
-                    if (role === 'speed') {
-                        const sensorValue = parseInt(trimmedLine);
-                        if (!isNaN(sensorValue)) {
-                            setDevices(prev => ({
-                                ...prev,
-                                speed: {
-                                    ...prev.speed,
-                                    value: sensorValue
-                                }
-                            }));
-                            
-                            if (window.wave && window.wave.sourceNode) {
-                                // 調整播放速度
-                                window.wave.sourceNode.playbackRate.value = 2 - (sensorValue / 100);
-                            }
-                        }
-                    } 
-                    
-                    // 歌單控制器
-                    else if (role === 'playlist') {
-                        if (trimmedLine === 'SELECT_MUSIC_2') {
-                            const audioSelect = document.getElementById('audioSelect');
-                            if (audioSelect) {
-                                audioSelect.selectedIndex = 2; // 選擇第二首歌
-                                audioSelect.dispatchEvent(new Event('change'));
-                            }
-                        } else if (trimmedLine === 'SELECT_MUSIC_3') {
-                            const audioSelect = document.getElementById('audioSelect');
-                            if (audioSelect) {
-                                audioSelect.selectedIndex = 3; // 選擇第三首歌
-                                audioSelect.dispatchEvent(new Event('change'));
-                            }
-                        }
-                    }
+        const disconnectDevice = async (role) => {
+            const device = devices[role];
+            if (device) {
+                try {
+                    await device.reader.cancel();
+                    await device.port.close();
+                    setDevices(prev => ({
+                        ...prev,
+                        [role]: null
+                    }));
+                } catch (err) {
+                    console.error('斷開連接失敗:', err);
                 }
-            } catch (error) {
-                console.error('讀取錯誤:', error);
-                break;
             }
-        }
-    };
+        };
 
-    return (
-        <div className="p-4">
-            <div className="flex gap-4 mb-4">
-                <button 
-                    onClick={() => connectDevice('speed')}
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
-                >
-                    連接速度控制器
-                </button>
-                <button 
-                    onClick={() => connectDevice('playlist')}
-                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
-                >
-                    連接歌單控制器
-                </button>
-            </div>
-            
-            {Object.entries(devices).map(([role, device]) => 
-                device && (
-                    <div key={role} className="bg-gray-700 p-3 rounded mb-2">
-                        <div className="text-white">
-                            {role === 'speed' ? '速度控制器' : '歌單控制器'}
-                        </div>
-                        <div className="text-gray-300">
-                            值: {device.value}
-                        </div>
-                        <button 
-                            onClick={() => disconnectDevice(role)}
-                            className="text-red-400"
-                        >
-                            中斷
-                        </button>
-                    </div>
-                )
-            )}
-        </div>
-    );
-}const readFromDevice = async (role, reader) => {
-        let buffer = '';
-        while (true) {
-            try {
-                const { value, done } = await reader.read();
-                if (done) break;
+        const readFromDevice = async (role, reader) => {
+            let buffer = '';
+            while (true) {
+                try {
+                    const { value, done } = await reader.read();
+                    if (done) break;
 
-                const chunk = new TextDecoder().decode(value);
-                buffer += chunk;
+                    const chunk = new TextDecoder().decode(value);
+                    buffer += chunk;
 
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
 
-                for (const line of lines) {
-                    const trimmedLine = line.trim();
-                    
-                    if (role === 'playlist') {
-                        // Handle specific music selection messages
-                        if (trimmedLine === 'SELECT_MUSIC_2') {
-                            const audioSelect = document.getElementById('audioSelect');
-                            if (audioSelect) {
-                                audioSelect.selectedIndex = 2; // Second option (index 1)
-                                audioSelect.dispatchEvent(new Event('change'));
-                            }
-                        } else if (trimmedLine === 'SELECT_MUSIC_3') {
-                            const audioSelect = document.getElementById('audioSelect');
-                            if (audioSelect) {
-                                audioSelect.selectedIndex = 3; // Third option (index 2)
-                                audioSelect.dispatchEvent(new Event('change'));
-                            }
-                        }
-                    } else if (role === 'speed') {
-                        const sensorValue = parseInt(trimmedLine);
-                        if (!isNaN(sensorValue)) {
-                            setDevices(prev => {
-                                const device = prev[role];
-                                return {
+                    for (const line of lines) {
+                        const trimmedLine = line.trim();
+                        
+                        // 速度控制器
+                        if (role === 'speed') {
+                            const sensorValue = parseInt(trimmedLine);
+                            if (!isNaN(sensorValue)) {
+                                setDevices(prev => ({
                                     ...prev,
-                                    [role]: {
-                                        ...device,
-                                        value: sensorValue,
-                                        speed: 2 - (sensorValue / 100)
+                                    speed: {
+                                        ...prev.speed,
+                                        value: sensorValue
                                     }
-                                };
-                            });
-                            
-                            if (window.wave && window.wave.sourceNode) {
-                                window.wave.sourceNode.playbackRate.value = 2 - (sensorValue / 100);
+                                }));
+                                
+                                if (window.wave && window.wave.sourceNode) {
+                                    // 調整播放速度
+                                    window.wave.sourceNode.playbackRate.value = 2 - (sensorValue / 100);
+                                }
+                            }
+                        } 
+                        
+                        // 歌單控制器
+                        else if (role === 'playlist') {
+                            const audioSelect = document.getElementById('audioSelect');
+                            if (!audioSelect) continue;
+
+                            // 檢查當前是否正在播放
+                            const isCurrentlyPlaying = window.wave && window.wave.playing;
+
+                            if (trimmedLine === 'SELECT_MUSIC_2') {
+                                // 如果當前正在播放，先停止
+                                if (isCurrentlyPlaying) {
+                                    stopMusic();
+                                }
+                                
+                                // 選擇第二首歌
+                                audioSelect.selectedIndex = 2;
+                                audioSelect.dispatchEvent(new Event('change'));
+                                
+                                // 如果之前正在播放，自動開始播放新歌
+                                if (isCurrentlyPlaying) {
+                                    setTimeout(() => {
+                                        playMusic();
+                                    }, 500); // 稍微延遲以確保音樂載入
+                                }
+                            } else if (trimmedLine === 'SELECT_MUSIC_3') {
+                                // 如果當前正在播放，先停止
+                                if (isCurrentlyPlaying) {
+                                    stopMusic();
+                                }
+                                
+                                // 選擇第三首歌
+                                audioSelect.selectedIndex = 3;
+                                audioSelect.dispatchEvent(new Event('change'));
+                                
+                                // 如果之前正在播放，自動開始播放新歌
+                                if (isCurrentlyPlaying) {
+                                    setTimeout(() => {
+                                        playMusic();
+                                    }, 500); // 稍微延遲以確保音樂載入
+                                }
                             }
                         }
                     }
+                } catch (error) {
+                    console.error('讀取錯誤:', error);
+                    break;
                 }
-            } catch (error) {
-                console.error('Read error:', error);
-                break;
             }
-        }
-    };
+        };
+
+        return (
+            <div className="p-4">
+                <div className="flex gap-4 mb-4">
+                    <button 
+                        onClick={() => connectDevice('speed')}
+                        className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+                    >
+                        連接速度控制器
+                    </button>
+                    <button 
+                        onClick={() => connectDevice('playlist')}
+                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
+                    >
+                        連接歌單控制器
+                    </button>
+                </div>
+                
+                {Object.entries(devices).map(([role, device]) => 
+                    device && (
+                        <div key={role} className="bg-gray-700 p-3 rounded mb-2">
+                            <div className="text-white">
+                                {role === 'speed' ? '速度控制器' : '歌單控制器'}
+                            </div>
+                            <div className="text-gray-300">
+                                值: {device.value}
+                            </div>
+                            <button 
+                                onClick={() => disconnectDevice(role)}
+                                className="text-red-400"
+                            >
+                                中斷
+                            </button>
+                        </div>
+                    )
+                )}
+            </div>
+        );
+    }
 
     window.onload = function() {
         const container = document.getElementById('serial-controls');
@@ -545,6 +519,6 @@
             console.error('Container not found');
         }
     }
-    </script>
+</script>
 </body>
 </html>
