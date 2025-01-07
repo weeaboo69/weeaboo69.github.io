@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Origin-Trial" content="enable-web-serial">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Visualizer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+    <script src="../src/js/circular-audio-wave.js"></script>
+    <style>
+        /* Previous styles remain the same */
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: #2d2d2d;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .controls {
+            background: #2d2d2d;
+            padding: 1rem;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-size: 1rem;
+        }
+
+        .btn:hover {
+            background: #45a049;
+        }
+
+        .btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        #chart-container {
+            flex: 1;
+            min-height: 500px;
+            padding: 1rem;
+        }
+
+        .select {
+            padding: 10px;
+            border-radius: 5px;
+            background: #333;
+            color: white;
+            border: 1px solid #444;
+            min-width: 200px;
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .speed-value {
+            min-width: 60px;
+        }
+
+        #serial-controls {
+            background: #2d2d2d;
+            padding: 1rem;
+            margin: 1rem;
+            border-radius: 8px;
+        }
+
+        .bg-blue-500 {
+            background-color: #3b82f6;
+        }
+
+        .hover\:bg-blue-600:hover {
+            background-color: #2563eb;
+        }
+
+        .bg-gray-700 {
+            background-color: #374151;
+        }
+
+        .text-white {
+            color: white;
+        }
+
+        .text-green-400 {
+            color: #34d399;
+        }
+
+        .text-gray-300 {
+            color: #d1d5db;
+        }
+
+        .text-red-400 {
+            color: #f87171;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>謀聲</h1>
+    </div>
+
+    <div id="serial-controls">載入中...</div>
+
+    <div id="debugInfo" class="debug-info"></div>
+    <div id="errorMessage" class="error-message"></div>
+
+    <div class="controls">
+        <select id="audioSelect" class="select">
+            <option value="">選擇預設音樂</option>
+            <option value="audio/audio1.mp3">歌曲 1</option>
+            <option value="audio/屋頂.mp3">歌曲 2</option>
+            <option value="audio/想約.wav">歌曲 3</option>
+        </select>
+        
+        <div class="btn-group">
+            <button id="playBtn" class="btn" disabled>播放</button>
+            <button id="pauseBtn" class="btn" disabled>暫停</button>
+            <button id="stopBtn" class="btn" disabled>停止</button>
+        </div>
+
+        <div class="speed-control">
+            <span>速度:</span>
+            <span id="speedValue" class="speed-value">1.0x</span>
+        </div>
+
+        <select id="modeSelect" class="select">
+            <option value="default">默認波形</option>
+            <option value="sunburst">太陽爆發效果</option>
+        </select>
+    </div>
+
+    <div id="chart-container"></div>
+    
+    <div id="status" class="status">
+        請選擇音樂...
+    </div>
+
+    <!-- React Scripts -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+
+    <!-- Main Scripts -->
+    <script>
+        let wave = null;
+        let isPlaying = false;
+        let currentSpeedPercent = 100;
+        window.wave = null;
+
+        const playBtn = document.getElementById('playBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const audioSelect = document.getElementById('audioSelect');
+        const modeSelect = document.getElementById('modeSelect');
+        const status = document.getElementById('status');
+        const speedValue = document.getElementById('speedValue');
+
+        function initVisualizer(mode = 'default') {
+            if (wave) {
+                wave.destroy();
+            }
+            wave = new CircularAudioWave(document.getElementById('chart-container'), {
+                mode: mode,
+                loop: false
+            });
+            window.wave = wave;
+        }
+
+        async function loadAudio(audioUrl, displayName) {
+            status.textContent = '正在載入音樂...';
+            initVisualizer(modeSelect.value);
+            
+            try {
+                await wave.loadAudio(audioUrl);
+                status.textContent = `已載入: ${displayName}`;
+                playBtn.disabled = false;
+                pauseBtn.disabled = true;
+                stopBtn.disabled = false;
+            } catch (err) {
+                status.textContent = '載入音樂失敗';
+                console.error(err);
+            }
+        }
+
+        audioSelect.addEventListener('change', (e) => {
+            const selectedValue = e.target.value;
+            if (selectedValue) {
+                const displayName = e.target.options[e.target.selectedIndex].text;
+                loadAudio(selectedValue, displayName);
+            }
+        });
+
+        playBtn.addEventListener('click', () => {
+            if (wave && !isPlaying) {
+                wave.play();
+                isPlaying = true;
+                playBtn.disabled = true;
+                pauseBtn.disabled = false;
+                status.textContent = '播放中...';
+            }
+        });
+
+        pauseBtn.addEventListener('click', () => {
+            if (wave && isPlaying) {
+                wave.pause();
+                isPlaying = false;
+                playBtn.disabled = false;
+                pauseBtn.disabled = true;
+                status.textContent = '已暫停';
+            }
+        });
+
+        stopBtn.addEventListener('click', () => {
+            if (wave) {
+                wave.destroy();
+                initVisualizer(modeSelect.value);
+                isPlaying = false;
+                playBtn.disabled = false;
+                pauseBtn.disabled = true;
+                stopBtn.disabled = false;
+                status.textContent = '已停止';
+            }
+        });
+
+        modeSelect.addEventListener('change', (e) => {
+            const currentlyPlaying = isPlaying;
+            initVisualizer(e.target.value);
+            
+            const selectedAudio = audioSelect.value;
+            const displayName = audioSelect.options[audioSelect.selectedIndex].text;
+            
+            if (selectedAudio) {
+                loadAudio(selectedAudio, displayName).then(() => {
+                    if (currentlyPlaying) {
+                        wave.play();
+                        isPlaying = true;
+                        playBtn.disabled = true;
+                        pauseBtn.disabled = false;
+                    }
+                });
+            }
+        });
+
+        document.addEventListener('click', function() {
+            if (window.wave && window.wave.context && window.wave.context.state === 'suspended') {
+                window.wave.context.resume();
+            }
+        });
+
+        initVisualizer();
+    </script>
+
+    <!-- React Component -->
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function WheelSpeedController() {
+            const [wheelDevice, setWheelDevice] = useState(null);
+            const [currentSpeed, setCurrentSpeed] = useState(1.0);
+
+            const connectWheel = async () => {
+                try {
+                    const port = await navigator.serial.requestPort();
+                    await port.open({ baudRate: 9600 });
+                    const reader = port.readable.getReader();
+                    
+                    setWheelDevice({
+                        port,
+                        reader,
+                        speed: 1.0
+                    });
+
+                    readFromWheel(reader);
+                } catch (err) {
+                    console.error('Connection failed:', err);
+                }
+            };
+
+            const disconnectWheel = async () => {
+                if (wheelDevice) {
+                    try {
+                        await wheelDevice.reader.cancel();
+                        await wheelDevice.port.close();
+                        setWheelDevice(null);
+                        // Reset speed to normal when disconnected
+                        if (window.wave && window.wave.sourceNode) {
+                            window.wave.sourceNode.playbackRate.value = 1.0;
+                        }
+                        setCurrentSpeed(1.0);
+                        document.getElementById('speedValue').textContent = '1.0x';
+                    } catch (err) {
+                        console.error('Disconnect failed:', err);
+                    }
+                }
+            };
+
+            const readFromWheel = async (reader) => {
+                let buffer = '';
+                while (true) {
+                    try {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+
+                        const chunk = new TextDecoder().decode(value);
+                        buffer += chunk;
+
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || '';
+
+                        for (const line of lines) {
+                            const speedValue = parseInt(line.trim()) / 100; // Convert percentage to decimal
+                            if (!isNaN(speedValue)) {
+                                setCurrentSpeed(speedValue);
+                                if (window.wave && window.wave.sourceNode) {
+                                    window.wave.sourceNode.playbackRate.value = speedValue;
+                                }
+                                document.getElementById('speedValue').textContent = `${speedValue.toFixed(2)}x`;
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Read error:', error);
+                        break;
+                    }
+                }
+            };
+
+            return (
+                <div className="p-4">
+                    <div className="flex gap-4 mb-4">
+                        <button 
+                            onClick={connectWheel}
+                            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+                        >
+                            連接轉速控制器
+                        </button>
+                    </div>
+                    
+                    {wheelDevice && (
+                        <div className="bg-gray-700 p-3 rounded mb-2">
+                            <div className="text-white">
+                                轉速控制器已連接
+                            </div>
+                            <div className="text-gray-300">
+                                當前速度: {currentSpeed.toFixed(2)}x
+                            </div>
+                            <button 
+                                onClick={disconnectWheel}
+                                className="text-red-400 hover:text-red-300"
+                            >
+                                中斷連接
+                            </button>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        window.onload = function() {
+            const container = document.getElementById('serial-controls');
+            if (container) {
+                ReactDOM.createRoot(container).render(<WheelSpeedController />);
+            } else {
+                console.error('Container not found');
+            }
+        }
+    </script>
+</body>
+</html>
