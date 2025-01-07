@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+<!-- 前面的 head 和樣式部分保持不變 -->
 <head>
     <meta http-equiv="Origin-Trial" content="enable-web-serial">
     <meta charset="UTF-8">
@@ -8,7 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
     <script src="../src/js/circular-audio-wave.js"></script>
     <style>
-        /* Previous styles remain the same */
+        /* 保留原有樣式 */
         body {
             margin: 0;
             font-family: Arial, sans-serif;
@@ -92,36 +93,26 @@
             border-radius: 8px;
         }
 
-        .bg-blue-500 {
-            background-color: #3b82f6;
-        }
-
-        .hover\:bg-blue-600:hover {
-            background-color: #2563eb;
-        }
-
-        .bg-gray-700 {
-            background-color: #374151;
-        }
-
-        .text-white {
-            color: white;
-        }
-
-        .text-green-400 {
-            color: #34d399;
-        }
-
-        .text-gray-300 {
-            color: #d1d5db;
-        }
-
-        .text-red-400 {
-            color: #f87171;
-        }
+        /* Tailwind-like classes */
+        .bg-blue-500 { background-color: #3b82f6; }
+        .hover\:bg-blue-600:hover { background-color: #2563eb; }
+        .bg-green-500 { background-color: #22c55e; }
+        .hover\:bg-green-600:hover { background-color: #16a34a; }
+        .bg-gray-700 { background-color: #374151; }
+        .text-white { color: white; }
+        .text-green-400 { color: #34d399; }
+        .text-gray-300 { color: #d1d5db; }
+        .text-red-400 { color: #f87171; }
+        .p-4 { padding: 1rem; }
+        .p-3 { padding: 0.75rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .gap-4 { gap: 1rem; }
+        .rounded { border-radius: 0.25rem; }
+        .flex { display: flex; }
     </style>
 </head>
 <body>
+    <!-- HTML 結構保持不變 -->
     <div class="header">
         <h1>謀聲</h1>
     </div>
@@ -162,7 +153,7 @@
         請選擇音樂...
     </div>
 
-    <!-- React Scripts -->
+    <!-- 基本腳本保持不變 -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
@@ -182,6 +173,7 @@
         const status = document.getElementById('status');
         const speedValue = document.getElementById('speedValue');
 
+        // 其他基本功能保持不變...
         function initVisualizer(mode = 'default') {
             if (wave) {
                 wave.destroy();
@@ -190,7 +182,7 @@
                 mode: mode,
                 loop: false
             });
-            window.wave = wave;
+            window.wave = null;
         }
 
         async function loadAudio(audioUrl, displayName) {
@@ -209,6 +201,7 @@
             }
         }
 
+        // 事件監聽器保持不變...
         audioSelect.addEventListener('change', (e) => {
             const selectedValue = e.target.value;
             if (selectedValue) {
@@ -281,47 +274,58 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        function WheelSpeedController() {
-            const [wheelDevice, setWheelDevice] = useState(null);
-            const [currentSpeed, setCurrentSpeed] = useState(1.0);
+        function DualController() {
+            const [devices, setDevices] = useState({
+                wheel: null,
+                playlist: null
+            });
 
-            const connectWheel = async () => {
+            const connectDevice = async (type) => {
                 try {
                     const port = await navigator.serial.requestPort();
                     await port.open({ baudRate: 9600 });
                     const reader = port.readable.getReader();
                     
-                    setWheelDevice({
-                        port,
-                        reader,
-                        speed: 1.0
-                    });
+                    setDevices(prev => ({
+                        ...prev,
+                        [type]: {
+                            port,
+                            reader,
+                            value: type === 'wheel' ? 1.0 : 0
+                        }
+                    }));
 
-                    readFromWheel(reader);
+                    readFromDevice(type, reader);
                 } catch (err) {
                     console.error('Connection failed:', err);
                 }
             };
 
-            const disconnectWheel = async () => {
-                if (wheelDevice) {
+            const disconnectDevice = async (type) => {
+                const device = devices[type];
+                if (device) {
                     try {
-                        await wheelDevice.reader.cancel();
-                        await wheelDevice.port.close();
-                        setWheelDevice(null);
-                        // Reset speed to normal when disconnected
-                        if (window.wave && window.wave.sourceNode) {
-                            window.wave.sourceNode.playbackRate.value = 1.0;
+                        await device.reader.cancel();
+                        await device.port.close();
+                        setDevices(prev => ({
+                            ...prev,
+                            [type]: null
+                        }));
+                        
+                        // Reset speed if wheel is disconnected
+                        if (type === 'wheel') {
+                            if (window.wave && window.wave.sourceNode) {
+                                window.wave.sourceNode.playbackRate.value = 1.0;
+                            }
+                            document.getElementById('speedValue').textContent = '1.0x';
                         }
-                        setCurrentSpeed(1.0);
-                        document.getElementById('speedValue').textContent = '1.0x';
                     } catch (err) {
                         console.error('Disconnect failed:', err);
                     }
                 }
             };
 
-            const readFromWheel = async (reader) => {
+            const readFromDevice = async (type, reader) => {
                 let buffer = '';
                 while (true) {
                     try {
@@ -335,13 +339,24 @@
                         buffer = lines.pop() || '';
 
                         for (const line of lines) {
-                            const speedValue = parseInt(line.trim()) / 100; // Convert percentage to decimal
-                            if (!isNaN(speedValue)) {
-                                setCurrentSpeed(speedValue);
-                                if (window.wave && window.wave.sourceNode) {
-                                    window.wave.sourceNode.playbackRate.value = speedValue;
+                            if (type === 'wheel') {
+                                const speedValue = parseInt(line.trim()) / 100;
+                                if (!isNaN(speedValue)) {
+                                    if (window.wave && window.wave.sourceNode) {
+                                        window.wave.sourceNode.playbackRate.value = speedValue;
+                                    }
+                                    document.getElementById('speedValue').textContent = `${speedValue.toFixed(2)}x`;
                                 }
-                                document.getElementById('speedValue').textContent = `${speedValue.toFixed(2)}x`;
+                            } else if (type === 'playlist') {
+                                const command = line.trim();
+                                if (command === 'SELECT_MUSIC_2' || command === 'SELECT_MUSIC_3') {
+                                    const index = command === 'SELECT_MUSIC_2' ? 2 : 3;
+                                    const audioSelect = document.getElementById('audioSelect');
+                                    if (audioSelect && index < audioSelect.options.length) {
+                                        audioSelect.selectedIndex = index;
+                                        audioSelect.dispatchEvent(new Event('change'));
+                                    }
+                                }
                             }
                         }
                     } catch (error) {
@@ -355,23 +370,40 @@
                 <div className="p-4">
                     <div className="flex gap-4 mb-4">
                         <button 
-                            onClick={connectWheel}
+                            onClick={() => connectDevice('wheel')}
                             className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
                         >
                             連接轉速控制器
                         </button>
+                        <button 
+                            onClick={() => connectDevice('playlist')}
+                            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
+                        >
+                            連接歌單控制器
+                        </button>
                     </div>
                     
-                    {wheelDevice && (
+                    {devices.wheel && (
                         <div className="bg-gray-700 p-3 rounded mb-2">
                             <div className="text-white">
                                 轉速控制器已連接
                             </div>
-                            <div className="text-gray-300">
-                                當前速度: {currentSpeed.toFixed(2)}x
+                            <button 
+                                onClick={() => disconnectDevice('wheel')}
+                                className="text-red-400 hover:text-red-300"
+                            >
+                                中斷連接
+                            </button>
+                        </div>
+                    )}
+
+                    {devices.playlist && (
+                        <div className="bg-gray-700 p-3 rounded mb-2">
+                            <div className="text-white">
+                                歌單控制器已連接
                             </div>
                             <button 
-                                onClick={disconnectWheel}
+                                onClick={() => disconnectDevice('playlist')}
                                 className="text-red-400 hover:text-red-300"
                             >
                                 中斷連接
@@ -385,11 +417,10 @@
         window.onload = function() {
             const container = document.getElementById('serial-controls');
             if (container) {
-                ReactDOM.createRoot(container).render(<WheelSpeedController />);
+                ReactDOM.createRoot(container).render(<DualController />);
             } else {
                 console.error('Container not found');
             }
         }
     </script>
 </body>
-</html>
