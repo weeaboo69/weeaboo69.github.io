@@ -181,7 +181,7 @@
             }
             wave = new CircularAudioWave(document.getElementById('chart-container'), {
                 mode: mode,
-                loop: false
+                loop: true
             });
             window.wave = wave;
         }
@@ -239,35 +239,42 @@
         });
 
         stopBtn.addEventListener('click', () => {
-            if (wave) {
-                wave.destroy();
-                initVisualizer(modeSelect.value);
-                isPlaying = false;
-                playBtn.disabled = false;
-                pauseBtn.disabled = true;
-                stopBtn.disabled = false;
-                status.textContent = '已停止';
-            }
-        });
-
-        modeSelect.addEventListener('change', (e) => {
-            const currentlyPlaying = isPlaying;
-            initVisualizer(e.target.value);
-            
-            const selectedAudio = audioSelect.value;
+    if (wave) {
+        wave.destroy();
+        initVisualizer(modeSelect.value);
+        isPlaying = false;
+        playBtn.disabled = false;
+        pauseBtn.disabled = true;
+        stopBtn.disabled = false;
+        status.textContent = '已停止';
+        
+        // 如果有已選擇的音樂，重新載入它
+        const selectedAudio = audioSelect.value;
+        if (selectedAudio) {
             const displayName = audioSelect.options[audioSelect.selectedIndex].text;
-            
-            if (selectedAudio) {
-                loadAudio(selectedAudio, displayName).then(() => {
-                    if (currentlyPlaying) {
-                        wave.play();
-                        isPlaying = true;
-                        playBtn.disabled = true;
-                        pauseBtn.disabled = false;
-                    }
-                });
+            loadAudio(selectedAudio, displayName);
+        }
+    }
+});
+
+modeSelect.addEventListener('change', (e) => {
+    const currentlyPlaying = isPlaying;
+    initVisualizer(e.target.value);
+    
+    const selectedAudio = audioSelect.value;
+    const displayName = audioSelect.options[audioSelect.selectedIndex].text;
+    
+    if (selectedAudio) {
+        loadAudio(selectedAudio, displayName).then(() => {
+            if (currentlyPlaying) {
+                wave.play();
+                isPlaying = true;
+                playBtn.disabled = true;
+                pauseBtn.disabled = false;
             }
         });
+    }
+});
 
         document.addEventListener('click', function() {
             if (window.wave && window.wave.context && window.wave.context.state === 'suspended') {
