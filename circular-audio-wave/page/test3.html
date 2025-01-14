@@ -363,7 +363,7 @@ modeSelect.addEventListener('change', (e) => {
                                 const rawValue = parseInt(line.trim());
                                 if (!isNaN(rawValue)) {
                                     // 修改映射邏輯：將 0-100 映射到 0.5-2.0，使 50 對應到 1.0
-                                    const speedValue = 1.0 + ((rawValue - 50) / 50) * 1.0;
+                                    const speedValue = ((rawValue - 50) / 50) * 1.0;
                                     const normalizedSpeed = Math.max(0.5, Math.min(2.0, speedValue));
                                     
                                     if (wheelAudio) {
