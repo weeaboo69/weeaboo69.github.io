@@ -290,152 +290,180 @@ modeSelect.addEventListener('change', (e) => {
         const { useState, useEffect } = React;
 
         function DualController() {
-            const [devices, setDevices] = useState({
-                wheel: null,
-                playlist: null
+    const [devices, setDevices] = useState({
+        wheel: null,
+        playlist: null
+    });
+    const [wheelAudio, setWheelAudio] = useState(null);
+
+    useEffect(() => {
+        // 初始化輪子的音效
+        const initWheelAudio = async () => {
+            const wheelAudioVisualizer = new CircularAudioWave(document.getElementById('chart-container'), {
+                mode: 'default',
+                loop: true
             });
+            
+            try {
+                await wheelAudioVisualizer.loadAudio('audio/wheel_sound.mp3');
+                setWheelAudio(wheelAudioVisualizer);
+            } catch (err) {
+                console.error('Failed to load wheel audio:', err);
+            }
+        };
 
-            const connectDevice = async (type) => {
-                try {
-                    const port = await navigator.serial.requestPort();
-                    await port.open({ baudRate: 9600 });
-                    const reader = port.readable.getReader();
-                    
-                    setDevices(prev => ({
-                        ...prev,
-                        [type]: {
-                            port,
-                            reader,
-                            value: type === 'wheel' ? 1.0 : 0
-                        }
-                    }));
+        initWheelAudio();
 
-                    readFromDevice(type, reader);
-                } catch (err) {
-                    console.error('Connection failed:', err);
+        return () => {
+            if (wheelAudio) {
+                wheelAudio.destroy();
+            }
+        };
+    }, []);
+
+    const connectDevice = async (type) => {
+        try {
+            const port = await navigator.serial.requestPort();
+            await port.open({ baudRate: 9600 });
+            const reader = port.readable.getReader();
+            
+            setDevices(prev => ({
+                ...prev,
+                [type]: {
+                    port,
+                    reader,
+                    value: type === 'wheel' ? 1.0 : 0
                 }
-            };
+            }));
 
-            const disconnectDevice = async (type) => {
-                const device = devices[type];
-                if (device) {
-                    try {
-                        await device.reader.cancel();
-                        await device.port.close();
-                        setDevices(prev => ({
-                            ...prev,
-                            [type]: null
-                        }));
-                        
-                        // Reset speed if wheel is disconnected
-                        if (type === 'wheel') {
-                            if (window.wave && window.wave.sourceNode) {
-                                window.wave.sourceNode.playbackRate.value = 1.0;
-                            }
-                            document.getElementById('speedValue').textContent = '1.0x';
-                        }
-                    } catch (err) {
-                        console.error('Disconnect failed:', err);
-                    }
-                }
-            };
+            // 如果是輪子設備連接，自動播放輪子音效
+            if (type === 'wheel' && wheelAudio) {
+                wheelAudio.play();
+            }
 
-            const readFromDevice = async (type, reader) => {
-                let buffer = '';
-                while (true) {
-                    try {
-                        const { value, done } = await reader.read();
-                        if (done) break;
-
-                        const chunk = new TextDecoder().decode(value);
-                        buffer += chunk;
-
-                        const lines = buffer.split('\n');
-                        buffer = lines.pop() || '';
-
-                        for (const line of lines) {
-                            if (type === 'wheel') {
-                                const speedValue = parseInt(line.trim()) / 100;
-                                if (!isNaN(speedValue)) {
-                                    if (window.wave && window.wave.sourceNode) {
-                                        window.wave.sourceNode.playbackRate.value = speedValue;
-                                    }
-                                    document.getElementById('speedValue').textContent = `${speedValue.toFixed(2)}x`;
-                                }
-                            } else if (type === 'playlist') {
-                                const command = line.trim();
-                                if (command === 'SELECT_MUSIC_2' || command === 'SELECT_MUSIC_3') {
-                                    const index = command === 'SELECT_MUSIC_2' ? 2 : 3;
-                                    const audioSelect = document.getElementById('audioSelect');
-                                    if (audioSelect && index < audioSelect.options.length) {
-                                        audioSelect.selectedIndex = index;
-                                        audioSelect.dispatchEvent(new Event('change'));
-                                    }
-                                }
-                            }
-                        }
-                    } catch (error) {
-                        console.error('Read error:', error);
-                        break;
-                    }
-                }
-            };
-
-            return (
-                <div className="p-4">
-                    <div className="flex gap-4 mb-4">
-                        <button 
-                            onClick={() => connectDevice('wheel')}
-                            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
-                        >
-                            連接轉速控制器
-                        </button>
-                        <button 
-                            onClick={() => connectDevice('playlist')}
-                            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
-                        >
-                            連接歌單控制器
-                        </button>
-                    </div>
-                    
-                    {devices.wheel && (
-                        <div className="bg-gray-700 p-3 rounded mb-2">
-                            <div className="text-white">
-                                轉速控制器已連接
-                            </div>
-                            <button 
-                                onClick={() => disconnectDevice('wheel')}
-                                className="text-red-400 hover:text-red-300"
-                            >
-                                中斷連接
-                            </button>
-                        </div>
-                    )}
-
-                    {devices.playlist && (
-                        <div className="bg-gray-700 p-3 rounded mb-2">
-                            <div className="text-white">
-                                歌單控制器已連接
-                            </div>
-                            <button 
-                                onClick={() => disconnectDevice('playlist')}
-                                className="text-red-400 hover:text-red-300"
-                            >
-                                中斷連接
-                            </button>
-                        </div>
-                    )}
-                </div>
-            );
+            readFromDevice(type, reader);
+        } catch (err) {
+            console.error('Connection failed:', err);
         }
+    };
 
-        window.onload = function() {
-            const container = document.getElementById('serial-controls');
-            if (container) {
-                ReactDOM.createRoot(container).render(<DualController />);
-            } else {
-                console.error('Container not found');
+    const disconnectDevice = async (type) => {
+        const device = devices[type];
+        if (device) {
+            try {
+                await device.reader.cancel();
+                await device.port.close();
+                setDevices(prev => ({
+                    ...prev,
+                    [type]: null
+                }));
+                
+                // 如果是輪子斷開連接，停止輪子音效
+                if (type === 'wheel' && wheelAudio) {
+                    wheelAudio.pause();
+                }
+            } catch (err) {
+                console.error('Disconnect failed:', err);
             }
         }
+    };
+
+    const readFromDevice = async (type, reader) => {
+        let buffer = '';
+        while (true) {
+            try {
+                const { value, done } = await reader.read();
+                if (done) break;
+
+                const chunk = new TextDecoder().decode(value);
+                buffer += chunk;
+
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (type === 'wheel') {
+                        const speedValue = parseInt(line.trim()) / 100;
+                        if (!isNaN(speedValue) && wheelAudio) {
+                            // 只控制輪子音效的速度
+                            wheelAudio.setPlaybackRate(speedValue);
+                        }
+                    } else if (type === 'playlist') {
+                        const command = line.trim();
+                        if (command === 'SELECT_MUSIC_2' || command === 'SELECT_MUSIC_3') {
+                            const index = command === 'SELECT_MUSIC_2' ? 2 : 3;
+                            const audioSelect = document.getElementById('audioSelect');
+                            if (audioSelect && index < audioSelect.options.length) {
+                                audioSelect.selectedIndex = index;
+                                audioSelect.dispatchEvent(new Event('change'));
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Read error:', error);
+                break;
+            }
+        }
+    };
+
+    return (
+        <div className="p-4">
+            <div className="flex gap-4 mb-4">
+                <button 
+                    onClick={() => connectDevice('wheel')}
+                    className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded"
+                >
+                    連接轉速控制器
+                </button>
+                <button 
+                    onClick={() => connectDevice('playlist')}
+                    className="bg-green-500 hover:bg-green-600 text-white p-2 rounded"
+                >
+                    連接歌單控制器
+                </button>
+            </div>
+            
+            {devices.wheel && (
+                <div className="bg-gray-700 p-3 rounded mb-2">
+                    <div className="text-white">
+                        轉速控制器已連接
+                    </div>
+                    <button 
+                        onClick={() => disconnectDevice('wheel')}
+                        className="text-red-400 hover:text-red-300"
+                    >
+                        中斷連接
+                    </button>
+                </div>
+            )}
+
+            {devices.playlist && (
+                <div className="bg-gray-700 p-3 rounded mb-2">
+                    <div className="text-white">
+                        歌單控制器已連接
+                    </div>
+                    <button 
+                        onClick={() => disconnectDevice('playlist')}
+                        className="text-red-400 hover:text-red-300"
+                    >
+                        中斷連接
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
+export default DualController;
+
+        window.onload = function() {
+    const container = document.getElementById('serial-controls');
+    if (container) {
+        ReactDOM.createRoot(container).render(<DualController />);
+    } else {
+        console.error('Container not found');
+    }
+    initVisualizer();
+};
     </script>
 </body>
