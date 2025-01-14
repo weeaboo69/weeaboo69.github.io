@@ -286,16 +286,14 @@ modeSelect.addEventListener('change', (e) => {
 
     <!-- React Component -->
     <script type="text/babel">
-         function DualController() {
-        const [devices, setDevices] = React.useState({
-            wheel: null,
-            playlist: null
-        });
-        const [wheelAudio, setWheelAudio] = React.useState(null);
-
-
+        function DualController() {
+            const [devices, setDevices] = React.useState({
+                wheel: null,
+                playlist: null
+            });
+            const [wheelAudio, setWheelAudio] = React.useState(null);
+    
             React.useEffect(() => {
-                // 初始化輪子的音效
                 const initWheelAudio = async () => {
                     const wheelAudioVisualizer = new CircularAudioWave(document.getElementById('chart-container'), {
                         mode: 'default',
@@ -303,22 +301,24 @@ modeSelect.addEventListener('change', (e) => {
                     });
                     
                     try {
-                        await wheelAudioVisualizer.loadAudio("audio/wheel_sound.mp3");
+                        await wheelAudioVisualizer.loadAudio('audio/wheel_sound.mp3');
+                        // 設置初始播放速度為 1
+                        wheelAudioVisualizer.setPlaybackRate(1.0);
                         setWheelAudio(wheelAudioVisualizer);
                     } catch (err) {
                         console.error('Failed to load wheel audio:', err);
                     }
                 };
-
+    
                 initWheelAudio();
-
+    
                 return () => {
                     if (wheelAudio) {
                         wheelAudio.destroy();
                     }
                 };
             }, []);
-
+    
             const connectDevice = async (type) => {
                 try {
                     const port = await navigator.serial.requestPort();
@@ -333,17 +333,65 @@ modeSelect.addEventListener('change', (e) => {
                             value: type === 'wheel' ? 1.0 : 0
                         }
                     }));
-
+    
                     if (type === 'wheel' && wheelAudio) {
+                        wheelAudio.setPlaybackRate(1.0); // 確保連接時速度為 1
                         wheelAudio.play();
                     }
-
+    
                     readFromDevice(type, reader);
                 } catch (err) {
                     console.error('Connection failed:', err);
                 }
             };
-
+    
+            const readFromDevice = async (type, reader) => {
+                let buffer = '';
+                while (true) {
+                    try {
+                        const { value, done } = await reader.read();
+                        if (done) break;
+    
+                        const chunk = new TextDecoder().decode(value);
+                        buffer += chunk;
+    
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || '';
+    
+                        for (const line of lines) {
+                            if (type === 'wheel') {
+                                const rawValue = parseInt(line.trim());
+                                if (!isNaN(rawValue)) {
+                                    // 修改映射邏輯：將 0-100 映射到 0.5-2.0，使 50 對應到 1.0
+                                    const speedValue = 1.0 + ((rawValue - 50) / 50) * 1.0;
+                                    const normalizedSpeed = Math.max(0.5, Math.min(2.0, speedValue));
+                                    
+                                    if (wheelAudio) {
+                                        wheelAudio.setPlaybackRate(normalizedSpeed);
+                                        document.getElementById('wheelSpeedValue').textContent = 
+                                            `${normalizedSpeed.toFixed(2)}x`;
+                                    }
+                                    console.log('Raw value:', rawValue, 'Speed value:', normalizedSpeed);
+                                }
+                            } else if (type === 'playlist') {
+                                const command = line.trim();
+                                if (command === 'SELECT_MUSIC_2' || command === 'SELECT_MUSIC_3') {
+                                    const index = command === 'SELECT_MUSIC_2' ? 2 : 3;
+                                    const audioSelect = document.getElementById('audioSelect');
+                                    if (audioSelect && index < audioSelect.options.length) {
+                                        audioSelect.selectedIndex = index;
+                                        audioSelect.dispatchEvent(new Event('change'));
+                                    }
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Read error:', error);
+                        break;
+                    }
+                }
+            };
+    
             const disconnectDevice = async (type) => {
                 const device = devices[type];
                 if (device) {
@@ -363,94 +411,65 @@ modeSelect.addEventListener('change', (e) => {
                     }
                 }
             };
-
-            const readFromDevice = async (type, reader) => {
-            let buffer = '';
-            while (true) {
-                try {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-
-                    const chunk = new TextDecoder().decode(value);
-                    buffer += chunk;
-
-                    const lines = buffer.split('\n');
-                    buffer = lines.pop() || '';
-
-                    for (const line of lines) {
-                        if (type === 'wheel') {
-                            // 解析速度值並轉換到合適的範圍
-                            const rawValue = parseInt(line.trim());
-                            if (!isNaN(rawValue)) {
-                                // 將 0-100 的值映射到 0.5-2.0 的範圍
-                                const speedValue = 0.5 + (rawValue / 100) * 1.5;
-                                
-                                if (wheelAudio) {
-                                    wheelAudio.setPlaybackRate(speedValue);
-                                    // 更新顯示的速度值
-                                    document.getElementById('wheelSpeedValue').textContent = 
-                                        `${speedValue.toFixed(2)}x`;
-                                }
-                                console.log('Raw value:', rawValue, 'Speed value:', speedValue);
-                            }
-                        } else if (type === 'playlist') {
-                            // ... 歌單控制部分保持不變 ...
-                        }
-                    }
-                } catch (error) {
-                    console.error('Read error:', error);
-                    break;
-                }
-            }
-        };
-
-        return (
-            <div className="p-4">
-                <div className="flex gap-4 mb-4">
-                    <button 
-                        onClick={() => connectDevice('wheel')}
-                        className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded"
-                    >
-                        連接轉速控制器
-                    </button>
-                    <button 
-                        onClick={() => connectDevice('playlist')}
-                        className="bg-green-500 hover:bg-green-600 text-white p-2 rounded"
-                    >
-                        連接歌單控制器
-                    </button>
-                </div>
-                
-                {devices.wheel && (
-                    <div className="bg-gray-700 p-3 rounded mb-2">
-                        <div className="text-white">
-                            轉速控制器已連接
-                            <div>速度: <span id="wheelSpeedValue">1.00x</span></div>
-                        </div>
+    
+            return (
+                <div className="p-4">
+                    <div className="flex gap-4 mb-4">
                         <button 
-                            onClick={() => disconnectDevice('wheel')}
-                            className="text-red-400 hover:text-red-300"
+                            onClick={() => connectDevice('wheel')}
+                            className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded"
                         >
-                            中斷連接
+                            連接轉速控制器
+                        </button>
+                        <button 
+                            onClick={() => connectDevice('playlist')}
+                            className="bg-green-500 hover:bg-green-600 text-white p-2 rounded"
+                        >
+                            連接歌單控制器
                         </button>
                     </div>
-                )}
-
-                {/* ... 其他界面元素保持不變 ... */}
-            </div>
-        );
-    }
-
-
+                    
+                    {devices.wheel && (
+                        <div className="bg-gray-700 p-3 rounded mb-2">
+                            <div className="text-white">
+                                轉速控制器已連接
+                                <div>速度: <span id="wheelSpeedValue">1.00x</span></div>
+                            </div>
+                            <button 
+                                onClick={() => disconnectDevice('wheel')}
+                                className="text-red-400 hover:text-red-300"
+                            >
+                                中斷連接
+                            </button>
+                        </div>
+                    )}
+    
+                    {devices.playlist && (
+                        <div className="bg-gray-700 p-3 rounded mb-2">
+                            <div className="text-white">
+                                歌單控制器已連接
+                            </div>
+                            <button 
+                                onClick={() => disconnectDevice('playlist')}
+                                className="text-red-400 hover:text-red-300"
+                            >
+                                中斷連接
+                            </button>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+    
         // 渲染 React 組件
         window.onload = function() {
-        const container = document.getElementById('serial-controls');
-        if (container) {
-            ReactDOM.createRoot(container).render(<DualController />);
-        } else {
-            console.error('Container not found');
+            const container = document.getElementById('serial-controls');
+            if (container) {
+                ReactDOM.createRoot(container).render(<DualController />);
+            } else {
+                console.error('Container not found');
+            }
+            initVisualizer();
         }
-        initVisualizer();
-    }
     </script>
 </body>
