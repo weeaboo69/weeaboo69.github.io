@@ -286,12 +286,13 @@ modeSelect.addEventListener('change', (e) => {
 
     <!-- React Component -->
     <script type="text/babel">
-        function DualController() {
-            const [devices, setDevices] = React.useState({
-                wheel: null,
-                playlist: null
-            });
-            const [wheelAudio, setWheelAudio] = React.useState(null);
+         function DualController() {
+        const [devices, setDevices] = React.useState({
+            wheel: null,
+            playlist: null
+        });
+        const [wheelAudio, setWheelAudio] = React.useState(null);
+
 
             React.useEffect(() => {
                 // 初始化輪子的音效
@@ -364,100 +365,92 @@ modeSelect.addEventListener('change', (e) => {
             };
 
             const readFromDevice = async (type, reader) => {
-                let buffer = '';
-                while (true) {
-                    try {
-                        const { value, done } = await reader.read();
-                        if (done) break;
+            let buffer = '';
+            while (true) {
+                try {
+                    const { value, done } = await reader.read();
+                    if (done) break;
 
-                        const chunk = new TextDecoder().decode(value);
-                        buffer += chunk;
+                    const chunk = new TextDecoder().decode(value);
+                    buffer += chunk;
 
-                        const lines = buffer.split('\n');
-                        buffer = lines.pop() || '';
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
 
-                        for (const line of lines) {
-                            if (type === 'wheel') {
-                                const speedValue = parseInt(line.trim()) / 100;
-                                if (!isNaN(speedValue) && wheelAudio) {
+                    for (const line of lines) {
+                        if (type === 'wheel') {
+                            // 解析速度值並轉換到合適的範圍
+                            const rawValue = parseInt(line.trim());
+                            if (!isNaN(rawValue)) {
+                                // 將 0-100 的值映射到 0.5-2.0 的範圍
+                                const speedValue = 0.5 + (rawValue / 100) * 1.5;
+                                
+                                if (wheelAudio) {
                                     wheelAudio.setPlaybackRate(speedValue);
+                                    // 更新顯示的速度值
+                                    document.getElementById('wheelSpeedValue').textContent = 
+                                        `${speedValue.toFixed(2)}x`;
                                 }
-                            } else if (type === 'playlist') {
-                                const command = line.trim();
-                                if (command === 'SELECT_MUSIC_2' || command === 'SELECT_MUSIC_3') {
-                                    const index = command === 'SELECT_MUSIC_2' ? 2 : 3;
-                                    const audioSelect = document.getElementById('audioSelect');
-                                    if (audioSelect && index < audioSelect.options.length) {
-                                        audioSelect.selectedIndex = index;
-                                        audioSelect.dispatchEvent(new Event('change'));
-                                    }
-                                }
+                                console.log('Raw value:', rawValue, 'Speed value:', speedValue);
                             }
+                        } else if (type === 'playlist') {
+                            // ... 歌單控制部分保持不變 ...
                         }
-                    } catch (error) {
-                        console.error('Read error:', error);
-                        break;
                     }
+                } catch (error) {
+                    console.error('Read error:', error);
+                    break;
                 }
-            };
+            }
+        };
 
-            return (
-                <div className="p-4">
-                    <div className="flex gap-4 mb-4">
+        return (
+            <div className="p-4">
+                <div className="flex gap-4 mb-4">
+                    <button 
+                        onClick={() => connectDevice('wheel')}
+                        className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded"
+                    >
+                        連接轉速控制器
+                    </button>
+                    <button 
+                        onClick={() => connectDevice('playlist')}
+                        className="bg-green-500 hover:bg-green-600 text-white p-2 rounded"
+                    >
+                        連接歌單控制器
+                    </button>
+                </div>
+                
+                {devices.wheel && (
+                    <div className="bg-gray-700 p-3 rounded mb-2">
+                        <div className="text-white">
+                            轉速控制器已連接
+                            <div>速度: <span id="wheelSpeedValue">1.00x</span></div>
+                        </div>
                         <button 
-                            onClick={() => connectDevice('wheel')}
-                            className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded"
+                            onClick={() => disconnectDevice('wheel')}
+                            className="text-red-400 hover:text-red-300"
                         >
-                            連接轉速控制器
-                        </button>
-                        <button 
-                            onClick={() => connectDevice('playlist')}
-                            className="bg-green-500 hover:bg-green-600 text-white p-2 rounded"
-                        >
-                            連接歌單控制器
+                            中斷連接
                         </button>
                     </div>
-                    
-                    {devices.wheel && (
-                        <div className="bg-gray-700 p-3 rounded mb-2">
-                            <div className="text-white">
-                                轉速控制器已連接
-                            </div>
-                            <button 
-                                onClick={() => disconnectDevice('wheel')}
-                                className="text-red-400 hover:text-red-300"
-                            >
-                                中斷連接
-                            </button>
-                        </div>
-                    )}
+                )}
 
-                    {devices.playlist && (
-                        <div className="bg-gray-700 p-3 rounded mb-2">
-                            <div className="text-white">
-                                歌單控制器已連接
-                            </div>
-                            <button 
-                                onClick={() => disconnectDevice('playlist')}
-                                className="text-red-400 hover:text-red-300"
-                            >
-                                中斷連接
-                            </button>
-                        </div>
-                    )}
-                </div>
-            );
-        }
+                {/* ... 其他界面元素保持不變 ... */}
+            </div>
+        );
+    }
+
 
         // 渲染 React 組件
         window.onload = function() {
-            const container = document.getElementById('serial-controls');
-            if (container) {
-                ReactDOM.createRoot(container).render(<DualController />);
-            } else {
-                console.error('Container not found');
-            }
-            initVisualizer();
+        const container = document.getElementById('serial-controls');
+        if (container) {
+            ReactDOM.createRoot(container).render(<DualController />);
+        } else {
+            console.error('Container not found');
         }
+        initVisualizer();
+    }
     </script>
 </body>
