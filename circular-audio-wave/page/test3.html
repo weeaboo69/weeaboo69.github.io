@@ -249,52 +249,63 @@
         }
 
         async function setupRecording() {
-            try {
-                const audioDestination = wave.context.createMediaStreamDestination();
-                wave.gainNode.connect(audioDestination);
+    try {
+        // 主要音樂音頻
+        const audioDestination = wave.context.createMediaStreamDestination();
+        wave.gainNode.connect(audioDestination);
 
-                // 連接輪子音效到錄音器
-                const wheelSound = document.getElementById('wheelSound');
-                const wheelAudioContext = new AudioContext();
-                const wheelSource = wheelAudioContext.createMediaElementSource(wheelSound);
-                const wheelDestination = wheelAudioContext.createMediaStreamDestination();
-                wheelSource.connect(wheelDestination);
-                wheelSource.connect(wheelAudioContext.destination);
+        // 輪子音效
+        const wheelSound = document.getElementById('wheelSound');
+        const wheelContext = new AudioContext();
+        const wheelSource = wheelContext.createMediaElementSource(wheelSound);
+        const wheelDestination = wheelContext.createMediaStreamDestination();
+        wheelSource.connect(wheelDestination);
+        wheelSource.connect(wheelContext.destination);
 
-                // 合併兩個音頻流
-                const combinedTracks = [
-                    ...audioDestination.stream.getAudioTracks(),
-                    ...wheelDestination.stream.getAudioTracks()
-                ];
-                const combinedStream = new MediaStream(combinedTracks);
+        // 將所有音頻流合併
+        const tracks = [
+            ...audioDestination.stream.getAudioTracks(),
+            ...wheelDestination.stream.getAudioTracks(),
+        ];
 
-                mediaRecorder = new MediaRecorder(combinedStream);
+        // 確保所有音軌都是激活的
+        tracks.forEach(track => {
+            track.enabled = true;
+        });
 
-                mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        recordedChunks.push(event.data);
-                    }
-                };
+        const combinedStream = new MediaStream(tracks);
 
-                mediaRecorder.onstop = () => {
-                    const blob = new Blob(recordedChunks, { type: 'audio/webm' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
-                    a.download = 'recorded_audio.webm';
-                    document.body.appendChild(a);
-                    a.click();
-                    URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-                };
+        // 創建 MediaRecorder 實例
+        mediaRecorder = new MediaRecorder(combinedStream, {
+            mimeType: 'audio/webm;codecs=opus'
+        });
 
-                recordBtn.disabled = false;
-            } catch (err) {
-                console.error('錄音設置失敗:', err);
-                recordBtn.disabled = true;
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                recordedChunks.push(event.data);
             }
-        }
+        };
+
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `錄音_${new Date().toLocaleString()}.webm`;
+            document.body.appendChild(a);
+            a.click();
+            URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        };
+
+        recordBtn.disabled = false;
+
+    } catch (err) {
+        console.error('錄音設置失敗:', err);
+        recordBtn.disabled = true;
+    }
+}
 
         // 更新錄音計時器
         function updateRecordingTimer() {
