@@ -301,6 +301,7 @@
             }
         }
 
+
         function updatePlaybackRateWithRecording(rate) {
             if (window.wave && window.wave.sourceNode) {
                 window.wave.sourceNode.playbackRate.value = rate;
@@ -445,38 +446,36 @@
         const { useState, useEffect } = React;
 
         function DualController() {
-            const [devices, setDevices] = useState({
-                wheel: null,
-                playlist: null
-            });
-            const [wheelAudio, setWheelAudio] = React.useState(null);
-        }
+    const [devices, setDevices] = useState({
+        wheel: null,
+        playlist: null
+    });
+    const [wheelAudio, setWheelAudio] = useState(null);
 
-            React.useEffect(() => {
-                const initWheelAudio = async () => {
-                    const wheelAudioVisualizer = new CircularAudioWave(document.getElementById('chart-container'), {
-                        mode: 'default',
-                        loop: true
-                    });
-                    
-                    try {
-                        await wheelAudioVisualizer.loadAudio('audio/wheel_sound.mp3');
-                        // 設置初始播放速度為 1
-                        wheelAudioVisualizer.setPlaybackRate(1.0);
-                        setWheelAudio(wheelAudioVisualizer);
-                    } catch (err) {
-                        console.error('Failed to load wheel audio:', err);
-                    }
-                };
-    
-                initWheelAudio();
-    
-                return () => {
-                    if (wheelAudio) {
-                        wheelAudio.destroy();
-                    }
-                };
-            }, []);
+    useEffect(() => {
+        const initWheelAudio = async () => {
+            const wheelAudioVisualizer = new CircularAudioWave(document.getElementById('chart-container'), {
+                mode: 'default',
+                loop: true
+            });
+            
+            try {
+                await wheelAudioVisualizer.loadAudio('audio/wheel_sound.mp3');
+                wheelAudioVisualizer.setPlaybackRate(1.0);
+                setWheelAudio(wheelAudioVisualizer);
+            } catch (err) {
+                console.error('Failed to load wheel audio:', err);
+            }
+        };
+
+        initWheelAudio();
+
+        return () => {
+            if (wheelAudio) {
+                wheelAudio.destroy();
+            }
+        };
+    }, [wheelAudio]);
     
             const connectDevice = async (type) => {
                 try {
@@ -493,11 +492,6 @@
                         }
                     }));
 
-                    if (type === 'wheel' && wheelAudio) {
-                        wheelAudio.setPlaybackRate(1.0); // 確保連接時速度為 1
-                        wheelAudio.play();
-                    }
-    
                     if (type === 'wheel' && wheelAudio) {
                         wheelAudio.setPlaybackRate(1.0); // 確保連接時速度為 1
                         wheelAudio.play();
