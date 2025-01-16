@@ -117,6 +117,7 @@
         <h1>謀聲</h1>
     </div>
 
+    <audio id="wheelSound" src="audio/wheel_sound.mp3" loop></audio>
     <div id="serial-controls">載入中...</div>
 
     <div id="debugInfo" class="debug-info"></div>
@@ -322,18 +323,20 @@ modeSelect.addEventListener('change', (e) => {
                     try {
                         await device.reader.cancel();
                         await device.port.close();
+                        
+                        // 如果是輪子控制器斷開，停止音效
+                        if (type === 'wheel') {
+                            const wheelSound = document.getElementById('wheelSound');
+                            if (wheelSound) {
+                                wheelSound.pause();
+                                wheelSound.currentTime = 0;
+                            }
+                        }
+                        
                         setDevices(prev => ({
                             ...prev,
                             [type]: null
                         }));
-                        
-                        // Reset speed if wheel is disconnected
-                        if (type === 'wheel') {
-                            if (window.wave && window.wave.sourceNode) {
-                                window.wave.sourceNode.playbackRate.value = 1.0;
-                            }
-                            document.getElementById('speedValue').textContent = '1.0x';
-                        }
                     } catch (err) {
                         console.error('Disconnect failed:', err);
                     }
@@ -355,13 +358,19 @@ modeSelect.addEventListener('change', (e) => {
 
                         for (const line of lines) {
                             if (type === 'wheel') {
-                                const speedValue = parseInt(line.trim()) / 100;
-                                if (!isNaN(speedValue)) {
-                                    if (window.wave && window.wave.sourceNode) {
-                                        window.wave.sourceNode.playbackRate.value = speedValue;
+                const speedValue = parseInt(line.trim()) / 100;
+                            if (!isNaN(speedValue)) {
+                                // 控制輪子音效的播放速度
+                                const wheelSound = document.getElementById('wheelSound');
+                                if (wheelSound) {
+                                    wheelSound.playbackRate = speedValue;
+                                    
+                                    // 如果是第一次連接，開始播放音效
+                                    if (!wheelSound.playing) {
+                                        wheelSound.play();
                                     }
-                                    document.getElementById('speedValue').textContent = `${speedValue.toFixed(2)}x`;
                                 }
+                            }
                             } else if (type === 'playlist') {
                                 const command = line.trim();
                                 if (command === 'SELECT_MUSIC_2' || command === 'SELECT_MUSIC_3') {
