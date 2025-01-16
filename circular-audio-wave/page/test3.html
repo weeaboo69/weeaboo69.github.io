@@ -117,6 +117,13 @@
         <h1>謀聲</h1>
     </div>
 
+    <div class="recording-controls">
+        <button id="recordBtn" class="record-btn">
+            <span>開始錄音</span>
+        </button>
+        <span id="recordingTimer" class="recording-timer">00:00</span>
+    </div>
+
     <audio id="wheelSound" src="audio/wheel_sound.mp3" loop></audio>
     <div id="serial-controls">載入中...</div>
 
@@ -167,6 +174,16 @@
         let currentSpeedPercent = 100;
         window.wave = null;
 
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let isRecording = false;
+        let recordingStartTime = 0;
+        let timerInterval = null;
+
+        const recordBtn = document.getElementById('recordBtn');
+        const recordingTimer = document.getElementById('recordingTimer');
+
+
         const playBtn = document.getElementById('playBtn');
         const pauseBtn = document.getElementById('pauseBtn');
         const stopBtn = document.getElementById('stopBtn');
@@ -187,28 +204,113 @@
             window.wave = wave;
         }
 
+        async function setupRecording() {
+            try {
+                const audioDestination = wave.context.createMediaStreamDestination();
+                wave.gainNode.connect(audioDestination);
+
+                // 連接輪子音效到錄音器
+                const wheelSound = document.getElementById('wheelSound');
+                const wheelAudioContext = new AudioContext();
+                const wheelSource = wheelAudioContext.createMediaElementSource(wheelSound);
+                const wheelDestination = wheelAudioContext.createMediaStreamDestination();
+                wheelSource.connect(wheelDestination);
+                wheelSource.connect(wheelAudioContext.destination);
+
+                // 合併兩個音頻流
+                const combinedTracks = [
+                    ...audioDestination.stream.getAudioTracks(),
+                    ...wheelDestination.stream.getAudioTracks()
+                ];
+                const combinedStream = new MediaStream(combinedTracks);
+
+                mediaRecorder = new MediaRecorder(combinedStream);
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = 'recorded_audio.webm';
+                    document.body.appendChild(a);
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                };
+
+                recordBtn.disabled = false;
+            } catch (err) {
+                console.error('錄音設置失敗:', err);
+                recordBtn.disabled = true;
+            }
+        }
+
+        // 更新錄音計時器
+        function updateRecordingTimer() {
+            if (!isRecording) return;
+            
+            const duration = Date.now() - recordingStartTime;
+            const minutes = Math.floor(duration / 60000);
+            const seconds = Math.floor((duration % 60000) / 1000);
+            recordingTimer.textContent = 
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // 錄音按鈕事件處理
+        recordBtn.addEventListener('click', () => {
+            if (!isRecording) {
+                // 開始錄音
+                recordedChunks = [];
+                mediaRecorder.start();
+                isRecording = true;
+                recordBtn.textContent = '停止錄音';
+                recordBtn.classList.add('recording');
+                recordingStartTime = Date.now();
+                timerInterval = setInterval(updateRecordingTimer, 1000);
+            } else {
+                // 停止錄音
+                mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.textContent = '開始錄音';
+                recordBtn.classList.remove('recording');
+                clearInterval(timerInterval);
+                recordingTimer.textContent = '00:00';
+            }
+        });
+
         async function loadAudio(audioUrl, displayName) {
-    status.textContent = '正在載入音樂...';
-    initVisualizer(modeSelect.value);
-    
-    try {
-        await wave.loadAudio(audioUrl);
-        status.textContent = `已載入: ${displayName}`;
-        playBtn.disabled = false;
-        pauseBtn.disabled = true;
-        stopBtn.disabled = false;
-        
-        // 自動播放音樂
-        wave.play();
-        isPlaying = true;
-        playBtn.disabled = true;
-        pauseBtn.disabled = false;
-        status.textContent = '播放中...';
-    } catch (err) {
-        status.textContent = '載入音樂失敗';
-        console.error(err);
-    }
-}
+            status.textContent = '正在載入音樂...';
+            initVisualizer(modeSelect.value);
+            
+            try {
+                await wave.loadAudio(audioUrl);
+                status.textContent = `已載入: ${displayName}`;
+                playBtn.disabled = false;
+                pauseBtn.disabled = true;
+                stopBtn.disabled = false;
+                
+                // 設置錄音功能
+                await setupRecording();
+                
+                // 自動播放音樂
+                wave.play();
+                isPlaying = true;
+                playBtn.disabled = true;
+                pauseBtn.disabled = false;
+                status.textContent = '播放中...';
+            } catch (err) {
+                status.textContent = '載入音樂失敗';
+                console.error(err);
+            }
+        }
+
 
         // 事件監聽器保持不變...
         audioSelect.addEventListener('change', (e) => {
