@@ -284,7 +284,7 @@ class CircularAudioWave {
     setPlaybackRate(rate) {
         if (this.sourceNode && this.sourceNode.playbackRate) {
             // 確保速度在合理範圍內 (0.5 到 2.0)
-            const normalizedRate = Math.max(0.5, Math.min(rate, 2.0));
+            const normalizedRate = Math.max(0.0, Math.min(rate, 3.0));
             this.sourceNode.playbackRate.value = normalizedRate;
             
             // 如果需要的話，也更新內部的播放速度狀態
