@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html>
 <!-- 前面的 head 和樣式部分保持不變 -->
-
 <head>
     <meta http-equiv="Origin-Trial" content="enable-web-serial">
     <meta charset="UTF-8">
@@ -25,7 +24,7 @@
             background: #2d2d2d;
             padding: 1rem;
             text-align: center;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
 
         .controls {
@@ -95,68 +94,23 @@
         }
 
         /* Tailwind-like classes */
-        .bg-blue-500 {
-            background-color: #3b82f6;
-        }
-
-        .hover\:bg-blue-600:hover {
-            background-color: #2563eb;
-        }
-
-        .bg-green-500 {
-            background-color: #22c55e;
-        }
-
-        .hover\:bg-green-600:hover {
-            background-color: #16a34a;
-        }
-
-        .bg-gray-700 {
-            background-color: #374151;
-        }
-
-        .text-white {
-            color: white;
-        }
-
-        .text-green-400 {
-            color: #34d399;
-        }
-
-        .text-gray-300 {
-            color: #d1d5db;
-        }
-
-        .text-red-400 {
-            color: #f87171;
-        }
-
-        .p-4 {
-            padding: 1rem;
-        }
-
-        .p-3 {
-            padding: 0.75rem;
-        }
-
-        .mb-4 {
-            margin-bottom: 1rem;
-        }
-
-        .gap-4 {
-            gap: 1rem;
-        }
-
-        .rounded {
-            border-radius: 0.25rem;
-        }
-
-        .flex {
-            display: flex;
-        }
+        .bg-blue-500 { background-color: #3b82f6; }
+        .hover\:bg-blue-600:hover { background-color: #2563eb; }
+        .bg-green-500 { background-color: #22c55e; }
+        .hover\:bg-green-600:hover { background-color: #16a34a; }
+        .bg-gray-700 { background-color: #374151; }
+        .text-white { color: white; }
+        .text-green-400 { color: #34d399; }
+        .text-gray-300 { color: #d1d5db; }
+        .text-red-400 { color: #f87171; }
+        .p-4 { padding: 1rem; }
+        .p-3 { padding: 0.75rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .gap-4 { gap: 1rem; }
+        .rounded { border-radius: 0.25rem; }
+        .flex { display: flex; }
     </style>
 </head>
-
 <body>
     <!-- HTML 結構保持不變 -->
     <div class="header">
@@ -183,7 +137,7 @@
             <option value="audio/2.mp3">歌曲 2</option>
             <option value="audio/3.mp3">歌曲 3</option>
         </select>
-
+        
 
         <div class="btn-group">
             <button id="playBtn" class="btn" disabled>播放</button>
@@ -203,7 +157,7 @@
     </div>
 
     <div id="chart-container"></div>
-
+    
     <div id="status" class="status">
         請選擇音樂...
     </div>
@@ -251,15 +205,32 @@
         }
 
         async function setupRecording() {
-            try {
-                const wheelSound = document.getElementById('wheelSound');
-                const wheelAudioContext = new AudioContext();
-                const wheelSource = wheelAudioContext.createMediaElementSource(wheelSound);
-                const wheelDestination = wheelAudioContext.createMediaStreamDestination();
-                wheelSource.connect(wheelDestination);
-                wheelSource.connect(wheelAudioContext.destination);
+    try {
+        // 創建一個新的音頻上下文作為主要錄音源
+        const recordingContext = new AudioContext();
+        const mainDestination = recordingContext.createMediaStreamDestination();
 
-                mediaRecorder = new MediaRecorder(wheelDestination.stream);
+        // 連接主要音樂音源
+        const musicTrack = wave.context.createMediaStreamDestination();
+        wave.gainNode.connect(musicTrack);
+
+        // 連接輪子音效
+        const wheelSound = document.getElementById('wheelSound');
+        const wheelSource = recordingContext.createMediaElementSource(wheelSound);
+        const wheelTrack = recordingContext.createMediaStreamDestination();
+        wheelSource.connect(wheelTrack);
+        wheelSource.connect(recordingContext.destination);
+
+        // 合併所有音軌
+        const combinedTracks = [
+            ...musicTrack.stream.getAudioTracks(),
+            ...wheelTrack.stream.getAudioTracks()
+        ];
+        const combinedStream = new MediaStream(combinedTracks);
+
+        // 設置 MediaRecorder
+        mediaRecorder = new MediaRecorder(combinedStream);
+
 
                 mediaRecorder.ondataavailable = (event) => {
                     if (event.data.size > 0) {
@@ -273,7 +244,7 @@
                     const a = document.createElement('a');
                     a.style.display = 'none';
                     a.href = url;
-                    a.download = 'wheel_sound_recording.webm';
+                    a.download = 'recorded_audio.webm';
                     document.body.appendChild(a);
                     a.click();
                     URL.revokeObjectURL(url);
@@ -290,11 +261,11 @@
         // 更新錄音計時器
         function updateRecordingTimer() {
             if (!isRecording) return;
-
+            
             const duration = Date.now() - recordingStartTime;
             const minutes = Math.floor(duration / 60000);
             const seconds = Math.floor((duration % 60000) / 1000);
-            recordingTimer.textContent =
+            recordingTimer.textContent = 
                 `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         }
 
@@ -320,29 +291,30 @@
             }
         });
 
-        async function loadAudio(audioUrl, displayName) {
-            status.textContent = '正在載入音樂...';
-            initVisualizer(modeSelect.value);
+    async function loadAudio(audioUrl, displayName) {
+        status.textContent = '正在載入音樂...';
+        initVisualizer(modeSelect.value);
+        
+        try {
+            await wave.loadAudio(audioUrl);
+            status.textContent = `已載入: ${displayName}`;
+            playBtn.disabled = false;
+            pauseBtn.disabled = true;
+            stopBtn.disabled = false;
+            
+            await setupRecording();
 
-            try {
-                await wave.loadAudio(audioUrl);
-                status.textContent = `已載入: ${displayName}`;
-                playBtn.disabled = false;
-                pauseBtn.disabled = true;
-                stopBtn.disabled = false;
-
-                setupRecording(); // 移除 await，因為我們只需要設置輪子音效的錄音
-
-                wave.play();
-                isPlaying = true;
-                playBtn.disabled = true;
-                pauseBtn.disabled = false;
-                status.textContent = '播放中...';
-            } catch (err) {
-                status.textContent = '載入音樂失敗';
-                console.error(err);
-            }
+            // 自動播放音樂
+            wave.play();
+            isPlaying = true;
+            playBtn.disabled = true;
+            pauseBtn.disabled = false;
+            status.textContent = '播放中...';
+        } catch (err) {
+            status.textContent = '載入音樂失敗';
+            console.error(err);
         }
+    }
 
         // 事件監聽器保持不變...
         audioSelect.addEventListener('change', (e) => {
@@ -374,44 +346,44 @@
         });
 
         stopBtn.addEventListener('click', () => {
-            if (wave) {
-                wave.destroy();
-                initVisualizer(modeSelect.value);
-                isPlaying = false;
-                playBtn.disabled = false;
-                pauseBtn.disabled = true;
-                stopBtn.disabled = false;
-                status.textContent = '已停止';
-
-                // 如果有已選擇的音樂，重新載入它
-                const selectedAudio = audioSelect.value;
-                if (selectedAudio) {
-                    const displayName = audioSelect.options[audioSelect.selectedIndex].text;
-                    loadAudio(selectedAudio, displayName);
-                }
-            }
-        });
-
-        modeSelect.addEventListener('change', (e) => {
-            const currentlyPlaying = isPlaying;
-            initVisualizer(e.target.value);
-
-            const selectedAudio = audioSelect.value;
+    if (wave) {
+        wave.destroy();
+        initVisualizer(modeSelect.value);
+        isPlaying = false;
+        playBtn.disabled = false;
+        pauseBtn.disabled = true;
+        stopBtn.disabled = false;
+        status.textContent = '已停止';
+        
+        // 如果有已選擇的音樂，重新載入它
+        const selectedAudio = audioSelect.value;
+        if (selectedAudio) {
             const displayName = audioSelect.options[audioSelect.selectedIndex].text;
+            loadAudio(selectedAudio, displayName);
+        }
+    }
+});
 
-            if (selectedAudio) {
-                loadAudio(selectedAudio, displayName).then(() => {
-                    if (currentlyPlaying) {
-                        wave.play();
-                        isPlaying = true;
-                        playBtn.disabled = true;
-                        pauseBtn.disabled = false;
-                    }
-                });
+modeSelect.addEventListener('change', (e) => {
+    const currentlyPlaying = isPlaying;
+    initVisualizer(e.target.value);
+    
+    const selectedAudio = audioSelect.value;
+    const displayName = audioSelect.options[audioSelect.selectedIndex].text;
+    
+    if (selectedAudio) {
+        loadAudio(selectedAudio, displayName).then(() => {
+            if (currentlyPlaying) {
+                wave.play();
+                isPlaying = true;
+                playBtn.disabled = true;
+                pauseBtn.disabled = false;
             }
         });
+    }
+});
 
-        document.addEventListener('click', function () {
+        document.addEventListener('click', function() {
             if (window.wave && window.wave.context && window.wave.context.state === 'suspended') {
                 window.wave.context.resume();
             }
@@ -435,7 +407,7 @@
                     const port = await navigator.serial.requestPort();
                     await port.open({ baudRate: 9600 });
                     const reader = port.readable.getReader();
-
+                    
                     setDevices(prev => ({
                         ...prev,
                         [type]: {
@@ -457,7 +429,7 @@
                     try {
                         await device.reader.cancel();
                         await device.port.close();
-
+                        
                         // 如果是輪子控制器斷開，停止音效
                         if (type === 'wheel') {
                             const wheelSound = document.getElementById('wheelSound');
@@ -466,7 +438,7 @@
                                 wheelSound.currentTime = 0;
                             }
                         }
-
+                        
                         setDevices(prev => ({
                             ...prev,
                             [type]: null
@@ -493,27 +465,27 @@
                         for (const line of lines) {
                             if (type === 'wheel') {
                                 const lineLength = parseInt(line.trim());
-                                if (!isNaN(lineLength)) {
-                                    // 將原始值（0-100）映射到合適的播放速度範圍（例如 0.5-2.0）
-                                    const speedValue = (lineLength / 100);
-
-                                    // 控制輪子音效的播放速度
-                                    const wheelSound = document.getElementById('wheelSound');
-                                    if (wheelSound) {
-                                        wheelSound.playbackRate = speedValue;
-                                        console.log('Wheel sound speed:', speedValue); // 用於調試
-
-                                        // 如果音效還沒開始播放，開始播放
-                                        if (wheelSound.paused) {
-                                            wheelSound.play().catch(err => console.error('播放失敗:', err));
+                                    if (!isNaN(lineLength)) {
+                                        // 將原始值（0-100）映射到合適的播放速度範圍（例如 0.5-2.0）
+                                        const speedValue =(lineLength / 100);
+                                        
+                                        // 控制輪子音效的播放速度
+                                        const wheelSound = document.getElementById('wheelSound');
+                                        if (wheelSound) {
+                                            wheelSound.playbackRate = speedValue;
+                                            console.log('Wheel sound speed:', speedValue); // 用於調試
+                                            
+                                            // 如果音效還沒開始播放，開始播放
+                                            if (wheelSound.paused) {
+                                                wheelSound.play().catch(err => console.error('播放失敗:', err));
+                                            }
                                         }
                                     }
-                                }
 
                             } else if (type === 'playlist') {
                                 const command = line.trim();
                                 console.log('Received playlist command:', command); // 添加調試輸出
-
+                                
                                 if (command === 'SELECT_MUSIC_2' || command === 'SELECT_MUSIC_3') {
                                     // 選擇對應的音樂
                                     const index = command === 'SELECT_MUSIC_2' ? 1 : 2; // 修改索引值對應
@@ -538,26 +510,26 @@
             return (
                 <div className="p-4">
                     <div className="flex gap-4 mb-4">
-                        <button
+                        <button 
                             onClick={() => connectDevice('wheel')}
                             className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
                         >
                             連接轉速控制器
                         </button>
-                        <button
+                        <button 
                             onClick={() => connectDevice('playlist')}
                             className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
                         >
                             連接歌單控制器
                         </button>
                     </div>
-
+                    
                     {devices.wheel && (
                         <div className="bg-gray-700 p-3 rounded mb-2">
                             <div className="text-white">
                                 轉速控制器已連接
                             </div>
-                            <button
+                            <button 
                                 onClick={() => disconnectDevice('wheel')}
                                 className="text-red-400 hover:text-red-300"
                             >
@@ -571,7 +543,7 @@
                             <div className="text-white">
                                 歌單控制器已連接
                             </div>
-                            <button
+                            <button 
                                 onClick={() => disconnectDevice('playlist')}
                                 className="text-red-400 hover:text-red-300"
                             >
@@ -583,7 +555,7 @@
             );
         }
 
-        window.onload = function () {
+        window.onload = function() {
             const container = document.getElementById('serial-controls');
             if (container) {
                 ReactDOM.createRoot(container).render(<DualController />);
