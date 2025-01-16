@@ -92,7 +92,51 @@
             margin: 1rem;
             border-radius: 8px;
         }
+        .recording-controls {
+            background: #2d2d2d;
+            padding: 1rem;
+            margin-top: 1rem;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
 
+        .recording {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .record-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .record-btn:hover {
+            background: #c82333;
+        }
+
+        .record-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .recording-timer {
+            font-family: monospace;
+            font-size: 1.2rem;
+            color: #fff;
+        }
         /* Tailwind-like classes */
         .bg-blue-500 { background-color: #3b82f6; }
         .hover\:bg-blue-600:hover { background-color: #2563eb; }
