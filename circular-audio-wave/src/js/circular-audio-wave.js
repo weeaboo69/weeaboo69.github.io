@@ -282,16 +282,13 @@ class CircularAudioWave {
     }
 
     setPlaybackRate(rate) {
+        // 確保速度在允許的範圍內
+        rate = Math.max(this.minPlaybackRate, Math.min(rate, this.maxPlaybackRate));
+        
+        this.currentPlaybackRate = rate;
         if (this.sourceNode && this.sourceNode.playbackRate) {
-            // 確保速度在合理範圍內 (0.5 到 2.0)
-            const normalizedRate = Math.max(0.0, Math.min(rate, 3.0));
-            this.sourceNode.playbackRate.value = normalizedRate;
-            
-            // 如果需要的話，也更新內部的播放速度狀態
-            this.playbackRate = normalizedRate;
-            
-            // 可以添加一些調試信息
-            console.log('Setting playback rate to:', normalizedRate);
+            this.sourceNode.playbackRate.value = rate;
+            console.log('Playback rate set to:', rate); // 用於調試
         }
     }
 
@@ -300,6 +297,7 @@ class CircularAudioWave {
             this.playing = true;
             this.presetOption();
             
+            // 如果是從暫停狀態恢復
             if (this.pausedAt) {
                 this.startTime = this.context.currentTime - this.pausedAt;
                 this.sourceNode.start(0, this.pausedAt);
@@ -308,12 +306,14 @@ class CircularAudioWave {
                 this.sourceNode.start(0);
             }
             
-            // 確保在開始播放時設置正確的播放速度
-            if (this.playbackRate) {
-                this.sourceNode.playbackRate.value = this.playbackRate;
+            // 確保播放速度設置正確
+            if (this.sourceNode.playbackRate) {
+                this.sourceNode.playbackRate.value = this.currentPlaybackRate || 1.0;
             }
             
             this._debouncedDraw();
+        } else {
+            alert('Audio is not ready');
         }
     }
     // TODO
@@ -388,16 +388,17 @@ class CircularAudioWave {
     _setupAudioNodes() {
         this.analyser.smoothingTimeConstant = 0.3;
         this.analyser.fftSize = 2048;
-        
+    
+        // 添加音量控制節點
         this.gainNode = this.context.createGain();
         
         this.sourceNode.connect(this.analyser);
         this.sourceNode.connect(this.gainNode);
         this.gainNode.connect(this.context.destination);
         
-        // 初始化播放速度
-        if (this.playbackRate) {
-            this.sourceNode.playbackRate.value = this.playbackRate;
+        // 設置初始播放速度
+        if (this.currentPlaybackRate) {
+            this.sourceNode.playbackRate.value = this.currentPlaybackRate;
         }
         
         this.sourceNode.onended = this.onended.bind(this);
