@@ -361,7 +361,7 @@ modeSelect.addEventListener('change', (e) => {
                                     const rawSpeed = parseInt(line.trim());
                                     if (!isNaN(rawSpeed)) {
                                         // 將原始值（0-100）映射到合適的播放速度範圍（例如 0.5-2.0）
-                                        const speedValue = 0.5 + (rawSpeed / 100) * 1.5; // 這會給出 0.5-2.0 的範圍
+                                        const speedValue = 0.1 + (rawSpeed / 100) * 3.9; // 這會給出 0.5-2.0 的範圍
                                         
                                         // 控制輪子音效的播放速度
                                         const wheelSound = document.getElementById('wheelSound');
@@ -378,12 +378,18 @@ modeSelect.addEventListener('change', (e) => {
 
                             } else if (type === 'playlist') {
                                 const command = line.trim();
+                                console.log('Received playlist command:', command); // 添加調試輸出
+                                
                                 if (command === 'SELECT_MUSIC_2' || command === 'SELECT_MUSIC_3') {
-                                    const index = command === 'SELECT_MUSIC_2' ? 2 : 3;
+                                    // 選擇對應的音樂
+                                    const index = command === 'SELECT_MUSIC_2' ? 1 : 2; // 修改索引值對應
                                     const audioSelect = document.getElementById('audioSelect');
-                                    if (audioSelect && index < audioSelect.options.length) {
+                                    if (audioSelect) {
+                                        console.log('Changing to song index:', index); // 添加調試輸出
                                         audioSelect.selectedIndex = index;
-                                        audioSelect.dispatchEvent(new Event('change'));
+                                        // 觸發 change 事件來播放新選擇的音樂
+                                        const event = new Event('change', { bubbles: true });
+                                        audioSelect.dispatchEvent(event);
                                     }
                                 }
                             }
