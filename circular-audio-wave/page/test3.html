@@ -250,34 +250,21 @@
 
         async function setupRecording() {
     try {
-        // 主要音樂音頻
-        const audioDestination = wave.context.createMediaStreamDestination();
-        wave.gainNode.connect(audioDestination);
-
-        // 輪子音效
-        const wheelSound = document.getElementById('wheelSound');
-        const wheelContext = new AudioContext();
-        const wheelSource = wheelContext.createMediaElementSource(wheelSound);
-        const wheelDestination = wheelContext.createMediaStreamDestination();
-        wheelSource.connect(wheelDestination);
-        wheelSource.connect(wheelContext.destination);
-
-        // 將所有音頻流合併
-        const tracks = [
-            ...audioDestination.stream.getAudioTracks(),
-            ...wheelDestination.stream.getAudioTracks(),
-        ];
-
-        // 確保所有音軌都是激活的
-        tracks.forEach(track => {
-            track.enabled = true;
+        // 捕獲系統音頻輸出
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                mandatory: {
+                    chromeMediaSource: 'tab',
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false
+                }
+            }
         });
 
-        const combinedStream = new MediaStream(tracks);
-
-        // 創建 MediaRecorder 實例
-        mediaRecorder = new MediaRecorder(combinedStream, {
-            mimeType: 'audio/webm;codecs=opus'
+        mediaRecorder = new MediaRecorder(stream, {
+            mimeType: 'audio/webm;codecs=opus',
+            audioBitsPerSecond: 128000
         });
 
         mediaRecorder.ondataavailable = (event) => {
@@ -287,23 +274,30 @@
         };
 
         mediaRecorder.onstop = () => {
-            const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+            const blob = new Blob(recordedChunks, { 
+                type: 'audio/webm;codecs=opus' 
+            });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.style.display = 'none';
             a.href = url;
-            a.download = `錄音_${new Date().toLocaleString()}.webm`;
+            const now = new Date();
+            a.download = `錄音_${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}_${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}.webm`;
             document.body.appendChild(a);
             a.click();
             URL.revokeObjectURL(url);
             document.body.removeChild(a);
         };
 
+        // 每秒鐘確保收集一次數據
+        mediaRecorder.start(1000);
         recordBtn.disabled = false;
 
     } catch (err) {
         console.error('錄音設置失敗:', err);
+        console.error(err.message);
         recordBtn.disabled = true;
+        alert('無法啟動錄音功能：' + err.message);
     }
 }
 
@@ -320,25 +314,32 @@
 
         // 錄音按鈕事件處理
         recordBtn.addEventListener('click', () => {
-            if (!isRecording) {
-                // 開始錄音
-                recordedChunks = [];
-                mediaRecorder.start();
-                isRecording = true;
-                recordBtn.textContent = '停止錄音';
-                recordBtn.classList.add('recording');
-                recordingStartTime = Date.now();
-                timerInterval = setInterval(updateRecordingTimer, 1000);
-            } else {
-                // 停止錄音
-                mediaRecorder.stop();
-                isRecording = false;
-                recordBtn.textContent = '開始錄音';
-                recordBtn.classList.remove('recording');
-                clearInterval(timerInterval);
-                recordingTimer.textContent = '00:00';
-            }
-        });
+    if (!isRecording) {
+        // 開始錄音
+        recordedChunks = [];
+        try {
+            setupRecording();
+            isRecording = true;
+            recordBtn.textContent = '停止錄音';
+            recordBtn.classList.add('recording');
+            recordingStartTime = Date.now();
+            timerInterval = setInterval(updateRecordingTimer, 1000);
+        } catch (err) {
+            console.error('開始錄音失敗:', err);
+            alert('開始錄音失敗：' + err.message);
+        }
+    } else {
+        // 停止錄音
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+        }
+        isRecording = false;
+        recordBtn.textContent = '開始錄音';
+        recordBtn.classList.remove('recording');
+        clearInterval(timerInterval);
+        recordingTimer.textContent = '00:00';
+    }
+});
 
         async function loadAudio(audioUrl, displayName) {
             status.textContent = '正在載入音樂...';
