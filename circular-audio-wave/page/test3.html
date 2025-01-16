@@ -37,6 +37,53 @@
             flex-wrap: wrap;
         }
 
+        .connect-btn {
+            background: #4a5568;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            min-width: 140px;
+            text-align: center;
+        }
+
+        .connect-btn.wheel {
+            background: #4299e1;
+        }
+
+        .connect-btn.wheel:hover {
+            background: #3182ce;
+        }
+
+        .connect-btn.playlist {
+            background: #48bb78;
+        }
+
+        .connect-btn.playlist:hover {
+            background: #38a169;
+        }
+
+        /* 調整 controls 的樣式確保按鈕對齊 */
+        .controls {
+            background: #2d2d2d;
+            padding: 1rem;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        /* 錄音計時器樣式 */
+        .recording-timer {
+            margin-left: 0.5rem;
+            color: #fff;
+        }
+
         .btn,
         .record-btn {
             background: #4a5568;
@@ -344,7 +391,7 @@
             });
             window.wave = wave;
 
-            // 初始化輪子音效的 wave (不需要視覺化，所以 container 可以是隱藏的)
+            // 初始化輪子音效的 wave
             const hiddenContainer = document.createElement('div');
             hiddenContainer.style.display = 'none';
             document.body.appendChild(hiddenContainer);
@@ -355,20 +402,25 @@
             window.wheelWave = wheelWave;
 
             // 預載入輪子音效
-            wheelWave.loadAudio('audio/wheel_sound.mp3');
+            wheelWave.loadAudio('audio/wheel_sound.mp3').then(() => {
+                console.log('輪子音效載入完成');
+            });
         }
 
         async function setupRecording() {
             try {
-                // 兩個 wave 實例都使用相同的 AudioContext
-                const mainDestination = wave.context.createMediaStreamDestination();
-                const wheelDestination = wave.context.createMediaStreamDestination();
+                // 創建一個新的 AudioContext 用於混音
+                const mixingContext = new AudioContext();
+                const mainDestination = mixingContext.createMediaStreamDestination();
+                const wheelDestination = mixingContext.createMediaStreamDestination();
 
                 // 連接主要音樂
-                wave.gainNode.connect(mainDestination);
+                const mainSource = mixingContext.createMediaStreamSource(wave.context.createMediaStreamDestination().stream);
+                mainSource.connect(mainDestination);
 
                 // 連接輪子音效
-                wheelWave.gainNode.connect(wheelDestination);
+                const wheelSource = mixingContext.createMediaStreamSource(wheelWave.context.createMediaStreamDestination().stream);
+                wheelSource.connect(wheelDestination);
 
                 // 合併音軌
                 const combinedTracks = [
@@ -378,6 +430,7 @@
 
                 const combinedStream = new MediaStream(combinedTracks);
                 mediaRecorder = new MediaRecorder(combinedStream);
+
 
                 // 設定音效的全域引用，確保後續可以控制播放
                 window.wheelSource = wheelSource;
@@ -619,7 +672,8 @@
                                     const speedValue = (lineLength / 100);
                                     if (window.wheelWave && window.wheelWave.sourceNode) {
                                         window.wheelWave.sourceNode.playbackRate.value = speedValue;
-                                        if (!isPlaying) {
+                                        // 確保輪子音效在播放
+                                        if (!window.wheelWave.playing) {
                                             window.wheelWave.play();
                                         }
                                     }
@@ -651,16 +705,16 @@
 
             return (
                 <div className="p-4">
-                    <div className="flex gap-4 mb-4">
+                    <div className="flex gap-4 mb-4 justify-center">
                         <button
                             onClick={() => connectDevice('wheel')}
-                            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+                            className="connect-btn wheel"
                         >
                             連接轉速控制器
                         </button>
                         <button
                             onClick={() => connectDevice('playlist')}
-                            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
+                            className="connect-btn playlist"
                         >
                             連接歌單控制器
                         </button>
