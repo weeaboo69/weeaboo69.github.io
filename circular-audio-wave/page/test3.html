@@ -449,7 +449,35 @@
                 wheel: null,
                 playlist: null
             });
+            const [wheelAudio, setWheelAudio] = React.useState(null);
+        }
 
+            React.useEffect(() => {
+                const initWheelAudio = async () => {
+                    const wheelAudioVisualizer = new CircularAudioWave(document.getElementById('chart-container'), {
+                        mode: 'default',
+                        loop: true
+                    });
+                    
+                    try {
+                        await wheelAudioVisualizer.loadAudio('audio/wheel_sound.mp3');
+                        // 設置初始播放速度為 1
+                        wheelAudioVisualizer.setPlaybackRate(1.0);
+                        setWheelAudio(wheelAudioVisualizer);
+                    } catch (err) {
+                        console.error('Failed to load wheel audio:', err);
+                    }
+                };
+    
+                initWheelAudio();
+    
+                return () => {
+                    if (wheelAudio) {
+                        wheelAudio.destroy();
+                    }
+                };
+            }, []);
+    
             const connectDevice = async (type) => {
                 try {
                     const port = await navigator.serial.requestPort();
@@ -465,6 +493,16 @@
                         }
                     }));
 
+                    if (type === 'wheel' && wheelAudio) {
+                        wheelAudio.setPlaybackRate(1.0); // 確保連接時速度為 1
+                        wheelAudio.play();
+                    }
+    
+                    if (type === 'wheel' && wheelAudio) {
+                        wheelAudio.setPlaybackRate(1.0); // 確保連接時速度為 1
+                        wheelAudio.play();
+                    }
+    
                     readFromDevice(type, reader);
                 } catch (err) {
                     console.error('Connection failed:', err);
