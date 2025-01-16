@@ -272,17 +272,6 @@
             };
         }
 
-        function updatePlaybackRateWithRecording(rate) {
-            if (window.wave && window.wave.sourceNode) {
-                window.wave.sourceNode.playbackRate.value = rate;
-                
-                // 如果正在錄音，確保新的播放速率也被錄製
-                if (isRecording && recordingDestination) {
-                    // 重新連接音訊節點以確保新的播放速率被錄製
-                    window.wave.sourceNode.connect(recordingDestination);
-                }
-            }
-
         async function loadAudio(audioUrl, displayName) {
             status.textContent = '正在載入音樂...';
             initVisualizer(modeSelect.value);
@@ -306,6 +295,18 @@
             } catch (err) {
                 status.textContent = '載入音樂失敗';
                 console.error(err);
+            }
+        }
+        
+        function updatePlaybackRateWithRecording(rate) {
+            if (window.wave && window.wave.sourceNode) {
+                window.wave.sourceNode.playbackRate.value = rate;
+                
+                // 如果正在錄音，確保新的播放速率也被錄製
+                if (isRecording && recordingDestination) {
+                    // 重新連接音訊節點以確保新的播放速率被錄製
+                    window.wave.sourceNode.connect(recordingDestination);
+                }
             }
         }
 
@@ -424,6 +425,8 @@
                         }
                     }
                 });
+            }
+        });
 
         document.addEventListener('click', function() {
             if (window.wave && window.wave.context && window.wave.context.state === 'suspended') {
