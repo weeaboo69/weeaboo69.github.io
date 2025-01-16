@@ -361,7 +361,7 @@ modeSelect.addEventListener('change', (e) => {
                                     const rawSpeed = parseInt(line.trim());
                                     if (!isNaN(rawSpeed)) {
                                         // 將原始值（0-100）映射到合適的播放速度範圍（例如 0.5-2.0）
-                                        const speedValue = 0.1 + (rawSpeed / 100) * 3.9; // 這會給出 0.5-2.0 的範圍
+                                        const speedValue =(lineLength / 100) * 2.0;
                                         
                                         // 控制輪子音效的播放速度
                                         const wheelSound = document.getElementById('wheelSound');
