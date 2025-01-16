@@ -424,8 +424,6 @@
                         }
                     }
                 });
-            }
-        });
 
         document.addEventListener('click', function() {
             if (window.wave && window.wave.context && window.wave.context.state === 'suspended') {
@@ -616,6 +614,7 @@
             } else {
                 console.error('Container not found');
             }
+            initVisualizer();
         }
     </script>
 </body>
