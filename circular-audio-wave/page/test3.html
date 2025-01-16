@@ -93,46 +93,6 @@
             border-radius: 8px;
         }
 
-        .recording-controls {
-            background: #2d2d2d;
-            padding: 1rem;
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-
-        .btn-record {
-            background: #dc2626;
-            border: none;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background 0.3s;
-            font-size: 1rem;
-        }
-
-        .btn-record:hover {
-            background: #b91c1c;
-        }
-
-        .btn-record.recording {
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-
-        .recording-status {
-            color: #dc2626;
-            font-weight: bold;
-            margin-left: 1rem;
-        }
-
         /* Tailwind-like classes */
         .bg-blue-500 { background-color: #3b82f6; }
         .hover\:bg-blue-600:hover { background-color: #2563eb; }
@@ -194,11 +154,6 @@
         請選擇音樂...
     </div>
 
-    <div class="recording-controls">
-        <button id="recordBtn" class="btn-record">開始錄音</button>
-        <span id="recordingStatus" class="recording-status"></span>
-    </div>
-
     <!-- 基本腳本保持不變 -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -210,14 +165,6 @@
         let isPlaying = false;
         let currentSpeedPercent = 100;
         window.wave = null;
-
-        let mediaRecorder = null;
-        let audioChunks = [];
-        let isRecording = false;
-        let recordingDestination = null;
-        
-        const recordBtn = document.getElementById('recordBtn');
-        const recordingStatus = document.getElementById('recordingStatus');
 
         const playBtn = document.getElementById('playBtn');
         const pauseBtn = document.getElementById('pauseBtn');
@@ -239,80 +186,28 @@
             window.wave = wave;
         }
 
-        function setupRecording() {
-            if (!wave || !wave.context) {
-                console.error('Audio context not available');
-                return;
-            }
-
-            // 創建錄音用的目標節點
-            recordingDestination = wave.context.createMediaStreamDestination();
-            
-            // 連接主音訊源到錄音目標
-            wave.sourceNode.connect(recordingDestination);
-            
-            // 確保音訊也連接到 gainNode (用於控制音量)
-            if (wave.gainNode) {
-                wave.sourceNode.connect(wave.gainNode);
-                wave.gainNode.connect(wave.context.destination);
-            }
-            
-            // 設置 MediaRecorder
-            mediaRecorder = new MediaRecorder(recordingDestination.stream);
-            
-            mediaRecorder.ondataavailable = (event) => {
-                audioChunks.push(event.data);
-            };
-            
-            mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                const audioUrl = URL.createObjectURL(audioBlob);
-                const link = document.createElement('a');
-                link.href = audioUrl;
-                link.download = '錄音_' + new Date().toISOString() + '.wav';
-                link.click();
-                audioChunks = [];
-            };
-        }
-
         async function loadAudio(audioUrl, displayName) {
-            status.textContent = '正在載入音樂...';
-            initVisualizer(modeSelect.value);
-            
-            try {
-                await wave.loadAudio(audioUrl);
-                status.textContent = `已載入: ${displayName}`;
-                playBtn.disabled = false;
-                pauseBtn.disabled = true;
-                stopBtn.disabled = false;
-                
-                // 重新設置錄音
-                setupRecording();
-                
-                // 自動播放音樂
-                wave.play();
-                isPlaying = true;
-                playBtn.disabled = true;
-                pauseBtn.disabled = false;
-                status.textContent = '播放中...';
-            } catch (err) {
-                status.textContent = '載入音樂失敗';
-                console.error(err);
-            }
-        }
-
-
-        function updatePlaybackRateWithRecording(rate) {
-            if (window.wave && window.wave.sourceNode) {
-                window.wave.sourceNode.playbackRate.value = rate;
-                
-                // 如果正在錄音，確保新的播放速率也被錄製
-                if (isRecording && recordingDestination) {
-                    // 重新連接音訊節點以確保新的播放速率被錄製
-                    window.wave.sourceNode.connect(recordingDestination);
-                }
-            }
-        }
+    status.textContent = '正在載入音樂...';
+    initVisualizer(modeSelect.value);
+    
+    try {
+        await wave.loadAudio(audioUrl);
+        status.textContent = `已載入: ${displayName}`;
+        playBtn.disabled = false;
+        pauseBtn.disabled = true;
+        stopBtn.disabled = false;
+        
+        // 自動播放音樂
+        wave.play();
+        isPlaying = true;
+        playBtn.disabled = true;
+        pauseBtn.disabled = false;
+        status.textContent = '播放中...';
+    } catch (err) {
+        status.textContent = '載入音樂失敗';
+        console.error(err);
+    }
+}
 
         // 事件監聽器保持不變...
         audioSelect.addEventListener('change', (e) => {
@@ -320,28 +215,6 @@
             if (selectedValue) {
                 const displayName = e.target.options[e.target.selectedIndex].text;
                 loadAudio(selectedValue, displayName);
-            }
-        });
-
-        recordBtn.addEventListener('click', () => {
-            if (!isRecording) {
-                if (!mediaRecorder) {
-                    alert('請先播放音樂再開始錄音');
-                    return;
-                }
-                // 開始錄音
-                mediaRecorder.start();
-                isRecording = true;
-                recordBtn.textContent = '停止錄音';
-                recordBtn.classList.add('recording');
-                recordingStatus.textContent = '錄音中...';
-            } else {
-                // 停止錄音
-                mediaRecorder.stop();
-                isRecording = false;
-                recordBtn.textContent = '開始錄音';
-                recordBtn.classList.remove('recording');
-                recordingStatus.textContent = '';
             }
         });
 
@@ -366,71 +239,42 @@
         });
 
         stopBtn.addEventListener('click', () => {
-            if (wave) {
-                if (isRecording) {
-                    mediaRecorder.stop();
-                    isRecording = false;
-                    recordBtn.textContent = '開始錄音';
-                    recordBtn.classList.remove('recording');
-                    recordingStatus.textContent = '';
-                }
-                
-                wave.destroy();
-                initVisualizer(modeSelect.value);
-                isPlaying = false;
-                playBtn.disabled = false;
-                pauseBtn.disabled = true;
-                stopBtn.disabled = false;
-                status.textContent = '已停止';
-                
-                // 如果有已選擇的音樂，重新載入它
-                const selectedAudio = audioSelect.value;
-                if (selectedAudio) {
-                    const displayName = audioSelect.options[audioSelect.selectedIndex].text;
-                    loadAudio(selectedAudio, displayName);
-                }
-            }
-        });
-
-        modeSelect.addEventListener('change', (e) => {
-            const currentlyPlaying = isPlaying;
-            const wasRecording = isRecording;
-            
-            // 如果正在錄音，先停止錄音
-            if (isRecording) {
-                mediaRecorder.stop();
-                isRecording = false;
-                recordBtn.textContent = '開始錄音';
-                recordBtn.classList.remove('recording');
-                recordingStatus.textContent = '';
-            }
-            
-            initVisualizer(e.target.value);
-            
-            const selectedAudio = audioSelect.value;
+    if (wave) {
+        wave.destroy();
+        initVisualizer(modeSelect.value);
+        isPlaying = false;
+        playBtn.disabled = false;
+        pauseBtn.disabled = true;
+        stopBtn.disabled = false;
+        status.textContent = '已停止';
+        
+        // 如果有已選擇的音樂，重新載入它
+        const selectedAudio = audioSelect.value;
+        if (selectedAudio) {
             const displayName = audioSelect.options[audioSelect.selectedIndex].text;
-            
-            if (selectedAudio) {
-                loadAudio(selectedAudio, displayName).then(() => {
-                    if (currentlyPlaying) {
-                        wave.play();
-                        isPlaying = true;
-                        playBtn.disabled = true;
-                        pauseBtn.disabled = false;
-                        
-                        // 如果之前在錄音，重新開始錄音
-                        if (wasRecording) {
-                            setupRecording();
-                            mediaRecorder.start();
-                            isRecording = true;
-                            recordBtn.textContent = '停止錄音';
-                            recordBtn.classList.add('recording');
-                            recordingStatus.textContent = '錄音中...';
-                        }
-                    }
-                });
+            loadAudio(selectedAudio, displayName);
+        }
+    }
+});
+
+modeSelect.addEventListener('change', (e) => {
+    const currentlyPlaying = isPlaying;
+    initVisualizer(e.target.value);
+    
+    const selectedAudio = audioSelect.value;
+    const displayName = audioSelect.options[audioSelect.selectedIndex].text;
+    
+    if (selectedAudio) {
+        loadAudio(selectedAudio, displayName).then(() => {
+            if (currentlyPlaying) {
+                wave.play();
+                isPlaying = true;
+                playBtn.disabled = true;
+                pauseBtn.disabled = false;
             }
         });
+    }
+});
 
         document.addEventListener('click', function() {
             if (window.wave && window.wave.context && window.wave.context.state === 'suspended') {
@@ -446,37 +290,11 @@
         const { useState, useEffect } = React;
 
         function DualController() {
-    const [devices, setDevices] = useState({
-        wheel: null,
-        playlist: null
-    });
-    const [wheelAudio, setWheelAudio] = useState(null);
-
-    useEffect(() => {
-        const initWheelAudio = async () => {
-            const wheelAudioVisualizer = new CircularAudioWave(document.getElementById('chart-container'), {
-                mode: 'default',
-                loop: true
+            const [devices, setDevices] = useState({
+                wheel: null,
+                playlist: null
             });
-            
-            try {
-                await wheelAudioVisualizer.loadAudio('audio/wheel_sound.mp3');
-                wheelAudioVisualizer.setPlaybackRate(1.0);
-                setWheelAudio(wheelAudioVisualizer);
-            } catch (err) {
-                console.error('Failed to load wheel audio:', err);
-            }
-        };
 
-        initWheelAudio();
-
-        return () => {
-            if (wheelAudio) {
-                wheelAudio.destroy();
-            }
-        };
-    }, [wheelAudio]);
-    
             const connectDevice = async (type) => {
                 try {
                     const port = await navigator.serial.requestPort();
@@ -492,11 +310,6 @@
                         }
                     }));
 
-                    if (type === 'wheel' && wheelAudio) {
-                        wheelAudio.setPlaybackRate(1.0); // 確保連接時速度為 1
-                        wheelAudio.play();
-                    }
-    
                     readFromDevice(type, reader);
                 } catch (err) {
                     console.error('Connection failed:', err);
@@ -544,7 +357,9 @@
                             if (type === 'wheel') {
                                 const speedValue = parseInt(line.trim()) / 100;
                                 if (!isNaN(speedValue)) {
-                                    updatePlaybackRateWithRecording(speedValue);
+                                    if (window.wave && window.wave.sourceNode) {
+                                        window.wave.sourceNode.playbackRate.value = speedValue;
+                                    }
                                     document.getElementById('speedValue').textContent = `${speedValue.toFixed(2)}x`;
                                 }
                             } else if (type === 'playlist') {
