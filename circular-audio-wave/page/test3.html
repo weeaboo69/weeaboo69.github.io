@@ -358,8 +358,8 @@ modeSelect.addEventListener('change', (e) => {
 
                         for (const line of lines) {
                             if (type === 'wheel') {
-                                    const rawSpeed = parseInt(line.trim());
-                                    if (!isNaN(rawSpeed)) {
+                                const lineLength = parseInt(line.trim());
+                                    if (!isNaN(lineLength)) {
                                         // 將原始值（0-100）映射到合適的播放速度範圍（例如 0.5-2.0）
                                         const speedValue =(lineLength / 100) * 2.0;
                                         
