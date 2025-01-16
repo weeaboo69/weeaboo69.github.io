@@ -384,10 +384,14 @@
                 wheelWave.destroy();
             }
 
+            // 創建共用的 AudioContext
+            const sharedContext = new AudioContext();
+
             // 初始化主要音樂的 wave
             wave = new CircularAudioWave(document.getElementById('chart-container'), {
                 mode: mode,
-                loop: true
+                loop: true,
+                context: sharedContext  // 使用共用的 context
             });
             window.wave = wave;
 
@@ -397,30 +401,30 @@
             document.body.appendChild(hiddenContainer);
 
             wheelWave = new CircularAudioWave(hiddenContainer, {
-                loop: true
+                loop: true,
+                context: sharedContext  // 使用共用的 context
             });
             window.wheelWave = wheelWave;
 
             // 預載入輪子音效
-            wheelWave.loadAudio('audio/wheel_sound.mp3').then(() => {
-                console.log('輪子音效載入完成');
-            });
+            wheelWave.loadAudio('audio/wheel_sound.mp3');
         }
 
         async function setupRecording() {
             try {
-                // 創建一個新的 AudioContext 用於混音
-                const mixingContext = new AudioContext();
-                const mainDestination = mixingContext.createMediaStreamDestination();
-                const wheelDestination = mixingContext.createMediaStreamDestination();
+                // 使用共用的 context
+                const mainDestination = wave.context.createMediaStreamDestination();
+                const wheelDestination = wave.context.createMediaStreamDestination();
 
                 // 連接主要音樂
-                const mainSource = mixingContext.createMediaStreamSource(wave.context.createMediaStreamDestination().stream);
-                mainSource.connect(mainDestination);
+                wave.gainNode.connect(mainDestination);
 
                 // 連接輪子音效
-                const wheelSource = mixingContext.createMediaStreamSource(wheelWave.context.createMediaStreamDestination().stream);
-                wheelSource.connect(wheelDestination);
+                wheelWave.gainNode.connect(wheelDestination);
+
+                // 確保兩個音源都連接到揚聲器
+                wave.gainNode.connect(wave.context.destination);
+                wheelWave.gainNode.connect(wave.context.destination);
 
                 // 合併音軌
                 const combinedTracks = [
@@ -430,10 +434,6 @@
 
                 const combinedStream = new MediaStream(combinedTracks);
                 mediaRecorder = new MediaRecorder(combinedStream);
-
-
-                // 設定音效的全域引用，確保後續可以控制播放
-                window.wheelSource = wheelSource;
 
                 mediaRecorder.ondataavailable = (event) => {
                     if (event.data.size > 0) {
@@ -669,12 +669,14 @@
                             if (type === 'wheel') {
                                 const lineLength = parseInt(line.trim());
                                 if (!isNaN(lineLength)) {
-                                    const speedValue = (lineLength / 100);
+                                    const speedValue = lineLength / 100;
                                     if (window.wheelWave && window.wheelWave.sourceNode) {
                                         window.wheelWave.sourceNode.playbackRate.value = speedValue;
-                                        // 確保輪子音效在播放
+                                        // 如果 wheelWave 未在播放，則開始播放
                                         if (!window.wheelWave.playing) {
-                                            window.wheelWave.play();
+                                            window.wheelWave.play().catch(err => {
+                                                console.error('輪子音效播放失敗:', err);
+                                            });
                                         }
                                     }
                                 }
