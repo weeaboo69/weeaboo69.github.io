@@ -496,23 +496,32 @@
 
         async function loadAudio(audioUrl, displayName) {
             status.textContent = '正在載入音樂...';
+
+            // 保存當前 wheelWave 的狀態
+            const wasWheelPlaying = wheelWave ? wheelWave.playing : false;
+            const wheelPlaybackRate = wheelWave && wheelWave.sourceNode ? wheelWave.sourceNode.playbackRate.value : 1;
+
             initVisualizer(modeSelect.value);
 
             try {
+                // 重新載入輪子音效並恢復狀態
+                await wheelWave.loadAudio('audio/wheel_sound.mp3');
+                if (wasWheelPlaying) {
+                    wheelWave.play();
+                    if (wheelWave.sourceNode) {
+                        wheelWave.sourceNode.playbackRate.value = wheelPlaybackRate;
+                    }
+                }
+
+                // 載入主要音樂
                 await wave.loadAudio(audioUrl);
                 status.textContent = `已載入: ${displayName}`;
                 playBtn.disabled = false;
                 pauseBtn.disabled = true;
                 stopBtn.disabled = false;
 
+                // 設置錄音
                 await setupRecording();
-
-                // 自動播放音樂
-                wave.play();
-                isPlaying = true;
-                playBtn.disabled = true;
-                pauseBtn.disabled = false;
-                status.textContent = '播放中...';
             } catch (err) {
                 status.textContent = '載入音樂失敗';
                 console.error(err);
