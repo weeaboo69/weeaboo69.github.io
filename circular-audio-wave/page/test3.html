@@ -353,6 +353,7 @@
     <script>
         let wave = null;
         let wheelWave = null; // 輪子音效的 wave
+        let wheelWave2 = null;
         let isPlaying = false;
         let currentSpeedPercent = 100;
         window.wave = null;
@@ -382,14 +383,22 @@
                 const hiddenContainer = document.createElement('div');
                 hiddenContainer.style.display = 'none';
                 document.body.appendChild(hiddenContainer);
-
                 wheelWave = new CircularAudioWave(hiddenContainer, {
                     loop: true
                 });
                 window.wheelWave = wheelWave;
-
-                // 預載入輪子音效
                 wheelWave.loadAudio('audio/wheel_sound.mp3');
+            }
+
+            if (!wheelWave2) {
+                const hiddenContainer2 = document.createElement('div');
+                hiddenContainer2.style.display = 'none';
+                document.body.appendChild(hiddenContainer2);
+                wheelWave2 = new CircularAudioWave(hiddenContainer2, {
+                    loop: true
+                });
+                window.wheelWave2 = wheelWave2;
+                wheelWave2.loadAudio('audio/wheel_sound2.mp3');
             }
 
             // 只處理主要音樂的 wave
@@ -641,13 +650,11 @@
                         await device.reader.cancel();
                         await device.port.close();
 
-                        // 如果是輪子控制器斷開，停止音效
-                        if (type === 'wheel') {
-                            const wheelSound = document.getElementById('wheelSound');
-                            if (wheelSound) {
-                                wheelSound.pause();
-                                wheelSound.currentTime = 0;
-                            }
+                        // 根據類型停止對應的音效
+                        if (type === 'wheel' && window.wheelWave) {
+                            window.wheelWave.pause();
+                        } else if (type === 'wheel2' && window.wheelWave2) {
+                            window.wheelWave2.pause();
                         }
 
                         setDevices(prev => ({
@@ -674,18 +681,27 @@
                         buffer = lines.pop() || '';
 
                         for (const line of lines) {
-                            if (type === 'wheel' || type === 'wheel2') {
-                                const speedValue = parseFloat(line.trim());
-                                if (!isNaN(speedValue)) {
+                            if (type === 'wheel') {
+                                const lineLength = parseInt(line.trim());
+                                if (!isNaN(lineLength)) {
+                                    const speedValue = lineLength / 100;
                                     if (window.wheelWave && window.wheelWave.sourceNode) {
-                                        // wheel2 的速度直接使用 musicSpeed 值
-                                        const finalSpeed = type === 'wheel2' ?
-                                            speedValue : speedValue / 100;
-
-                                        window.wheelWave.sourceNode.playbackRate.value = finalSpeed;
+                                        window.wheelWave.sourceNode.playbackRate.value = speedValue;
                                         if (!window.wheelWave.playing) {
                                             window.wheelWave.play().catch(err => {
-                                                console.error('輪子音效播放失敗:', err);
+                                                console.error('輪子音效1播放失敗:', err);
+                                            });
+                                        }
+                                    }
+                                }
+                            } else if (type === 'wheel2') {
+                                const speedValue = parseFloat(line.trim());
+                                if (!isNaN(speedValue)) {
+                                    if (window.wheelWave2 && window.wheelWave2.sourceNode) {
+                                        window.wheelWave2.sourceNode.playbackRate.value = speedValue;
+                                        if (!window.wheelWave2.playing) {
+                                            window.wheelWave2.play().catch(err => {
+                                                console.error('輪子音效2播放失敗:', err);
                                             });
                                         }
                                     }
