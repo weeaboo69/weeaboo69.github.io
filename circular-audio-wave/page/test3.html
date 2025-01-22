@@ -299,14 +299,14 @@
     <div class="header">
         <h1>謀聲</h1>
     </div>
-
+    <!--錄音
     <div class="recording-controls">
         <button id="recordBtn" class="record-btn">
             <span>開始錄音</span>
         </button>
         <span id="recordingTimer" class="recording-timer">00:00</span>
     </div>
-
+-->
     <div id="serial-controls">載入中...</div>
 
     <div id="debugInfo" class="debug-info"></div>
@@ -377,37 +377,32 @@
 
         // 其他基本功能保持不變...
         function initVisualizer(mode = 'default') {
+            // 如果 wheelWave 還不存在，才初始化它
+            if (!wheelWave) {
+                const hiddenContainer = document.createElement('div');
+                hiddenContainer.style.display = 'none';
+                document.body.appendChild(hiddenContainer);
+
+                wheelWave = new CircularAudioWave(hiddenContainer, {
+                    loop: true
+                });
+                window.wheelWave = wheelWave;
+
+                // 預載入輪子音效
+                wheelWave.loadAudio('audio/wheel_sound.mp3');
+            }
+
+            // 只處理主要音樂的 wave
             if (wave) {
                 wave.destroy();
             }
-            if (wheelWave) {
-                wheelWave.destroy();
-            }
 
-            // 創建共用的 AudioContext
-            const sharedContext = new AudioContext();
-
-            // 初始化主要音樂的 wave
             wave = new CircularAudioWave(document.getElementById('chart-container'), {
                 mode: mode,
                 loop: true,
-                context: sharedContext  // 使用共用的 context
+                context: wheelWave.context  // 使用與 wheelWave 相同的 context
             });
             window.wave = wave;
-
-            // 初始化輪子音效的 wave
-            const hiddenContainer = document.createElement('div');
-            hiddenContainer.style.display = 'none';
-            document.body.appendChild(hiddenContainer);
-
-            wheelWave = new CircularAudioWave(hiddenContainer, {
-                loop: true,
-                context: sharedContext  // 使用共用的 context
-            });
-            window.wheelWave = wheelWave;
-
-            // 預載入輪子音效
-            wheelWave.loadAudio('audio/wheel_sound.mp3');
         }
 
         async function setupRecording() {
@@ -497,31 +492,34 @@
         async function loadAudio(audioUrl, displayName) {
             status.textContent = '正在載入音樂...';
 
-            // 保存當前 wheelWave 的狀態
-            const wasWheelPlaying = wheelWave ? wheelWave.playing : false;
-            const wheelPlaybackRate = wheelWave && wheelWave.sourceNode ? wheelWave.sourceNode.playbackRate.value : 1;
-
-            initVisualizer(modeSelect.value);
-
             try {
-                // 重新載入輪子音效並恢復狀態
-                await wheelWave.loadAudio('audio/wheel_sound.mp3');
-                if (wasWheelPlaying) {
-                    wheelWave.play();
-                    if (wheelWave.sourceNode) {
-                        wheelWave.sourceNode.playbackRate.value = wheelPlaybackRate;
-                    }
+                // 如果有正在播放的音樂，先停止它
+                if (wave && wave.playing) {
+                    wave.destroy();
                 }
 
-                // 載入主要音樂
+                // 初始化新的 wave，但保持 wheelWave 不變
+                wave = new CircularAudioWave(document.getElementById('chart-container'), {
+                    mode: modeSelect.value,
+                    loop: true,
+                    context: wheelWave.context  // 使用與 wheelWave 相同的 context
+                });
+                window.wave = wave;
+
+                // 載入並自動播放新音樂
                 await wave.loadAudio(audioUrl);
-                status.textContent = `已載入: ${displayName}`;
-                playBtn.disabled = false;
-                pauseBtn.disabled = true;
+                wave.play();
+                isPlaying = true;
+
+                // 更新狀態和按鈕
+                status.textContent = `播放中: ${displayName}`;
+                playBtn.disabled = true;
+                pauseBtn.disabled = false;
                 stopBtn.disabled = false;
 
-                // 設置錄音
+                // 重新設置錄音
                 await setupRecording();
+
             } catch (err) {
                 status.textContent = '載入音樂失敗';
                 console.error(err);
