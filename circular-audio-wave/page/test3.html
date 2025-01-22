@@ -306,7 +306,7 @@
         </button>
         <span id="recordingTimer" class="recording-timer">00:00</span>
     </div>
-    
+
     <div id="serial-controls">載入中...</div>
 
     <div id="debugInfo" class="debug-info"></div>
@@ -606,9 +606,10 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        function DualController() {
+        function MultiController() {
             const [devices, setDevices] = useState({
                 wheel: null,
+                wheel2: null,
                 playlist: null
             });
 
@@ -673,13 +674,15 @@
                         buffer = lines.pop() || '';
 
                         for (const line of lines) {
-                            if (type === 'wheel') {
-                                const lineLength = parseInt(line.trim());
-                                if (!isNaN(lineLength)) {
-                                    const speedValue = lineLength / 100;
+                            if (type === 'wheel' || type === 'wheel2') {
+                                const speedValue = parseFloat(line.trim());
+                                if (!isNaN(speedValue)) {
                                     if (window.wheelWave && window.wheelWave.sourceNode) {
-                                        window.wheelWave.sourceNode.playbackRate.value = speedValue;
-                                        // 如果 wheelWave 未在播放，則開始播放
+                                        // wheel2 的速度直接使用 musicSpeed 值
+                                        const finalSpeed = type === 'wheel2' ?
+                                            speedValue : speedValue / 100;
+
+                                        window.wheelWave.sourceNode.playbackRate.value = finalSpeed;
                                         if (!window.wheelWave.playing) {
                                             window.wheelWave.play().catch(err => {
                                                 console.error('輪子音效播放失敗:', err);
@@ -689,16 +692,13 @@
                                 }
                             } else if (type === 'playlist') {
                                 const command = line.trim();
-                                console.log('Received playlist command:', command); // 添加調試輸出
-
-                                if (command === 'SELECT_MUSIC_2' || command === 'SELECT_MUSIC_3') {
-                                    // 選擇對應的音樂
-                                    const index = command === 'SELECT_MUSIC_2' ? 1 : 2; // 修改索引值對應
+                                if (command === 'SELECT_MUSIC_1' ||
+                                    command === 'SELECT_MUSIC_2' ||
+                                    command === 'SELECT_MUSIC_3') {
+                                    const index = parseInt(command.slice(-1));
                                     const audioSelect = document.getElementById('audioSelect');
                                     if (audioSelect) {
-                                        console.log('Changing to song index:', index); // 添加調試輸出
                                         audioSelect.selectedIndex = index;
-                                        // 觸發 change 事件來播放新選擇的音樂
                                         const event = new Event('change', { bubbles: true });
                                         audioSelect.dispatchEvent(event);
                                     }
@@ -727,6 +727,12 @@
                         >
                             連接歌單控制器
                         </button>
+                        <button
+                            onClick={() => connectDevice('wheel2')}
+                            className="connect-btn wheel2"
+                        >
+                            連接轉速控制器2
+                        </button>
                     </div>
 
                     {devices.wheel && (
@@ -750,6 +756,20 @@
                             </div>
                             <button
                                 onClick={() => disconnectDevice('playlist')}
+                                className="text-red-400 hover:text-red-300"
+                            >
+                                中斷連接
+                            </button>
+                        </div>
+                    )}
+
+                    {devices.wheel2 && (
+                        <div className="bg-gray-700 p-3 rounded mb-2">
+                            <div className="text-white">
+                                轉速控制器 2 已連接
+                            </div>
+                            <button
+                                onClick={() => disconnectDevice('wheel2')}
                                 className="text-red-400 hover:text-red-300"
                             >
                                 中斷連接
