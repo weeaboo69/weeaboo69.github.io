@@ -649,7 +649,19 @@
                             value: type === 'wheel' ? 1.0 : 0
                         }
                     }));
-
+                    if (type === 'wheel' && window.wheelWave) {
+                        try {
+                            window.wheelWave.play();
+                        } catch (err) {
+                            console.error('輪子音效1播放失敗:', err);
+                        }
+                    } else if (type === 'wheel2' && window.wheelWave2) {
+                        try {
+                            window.wheelWave2.play();
+                        } catch (err) {
+                            console.error('輪子音效2播放失敗:', err);
+                        }
+                    }
                     readFromDevice(type, reader);
                 } catch (err) {
                     console.error('Connection failed:', err);
