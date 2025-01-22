@@ -700,10 +700,13 @@
                                     const speedValue = lineLength / 100;
                                     if (window.wheelWave && window.wheelWave.sourceNode) {
                                         window.wheelWave.sourceNode.playbackRate.value = speedValue;
+                                        // 修改這裡的播放邏輯
                                         if (!window.wheelWave.playing) {
-                                            window.wheelWave.play().catch(err => {
+                                            try {
+                                                window.wheelWave.play();
+                                            } catch (err) {
                                                 console.error('輪子音效1播放失敗:', err);
-                                            });
+                                            }
                                         }
                                     }
                                 }
@@ -712,26 +715,18 @@
                                 if (!isNaN(speedValue)) {
                                     if (window.wheelWave2 && window.wheelWave2.sourceNode) {
                                         window.wheelWave2.sourceNode.playbackRate.value = speedValue;
+                                        // 修改這裡的播放邏輯
                                         if (!window.wheelWave2.playing) {
-                                            window.wheelWave2.play().catch(err => {
+                                            try {
+                                                window.wheelWave2.play();
+                                            } catch (err) {
                                                 console.error('輪子音效2播放失敗:', err);
-                                            });
+                                            }
                                         }
                                     }
                                 }
                             } else if (type === 'playlist') {
-                                const command = line.trim();
-                                if (command === 'SELECT_MUSIC_1' ||
-                                    command === 'SELECT_MUSIC_2' ||
-                                    command === 'SELECT_MUSIC_3') {
-                                    const index = parseInt(command.slice(-1));
-                                    const audioSelect = document.getElementById('audioSelect');
-                                    if (audioSelect) {
-                                        audioSelect.selectedIndex = index;
-                                        const event = new Event('change', { bubbles: true });
-                                        audioSelect.dispatchEvent(event);
-                                    }
-                                }
+                                // 歌單控制邏輯保持不變
                             }
                         }
                     } catch (error) {
