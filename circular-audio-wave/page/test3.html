@@ -739,6 +739,18 @@
                                 }
                             } else if (type === 'playlist') {
                                 // 歌單控制邏輯保持不變
+                                const command = line.trim();
+                                if (command === 'SELECT_MUSIC_1' ||
+                                    command === 'SELECT_MUSIC_2' ||
+                                    command === 'SELECT_MUSIC_3') {
+
+                                    const index = parseInt(command.slice(-1));
+                                    const audioSelect = document.getElementById('audioSelect');
+                                    if (audioSelect) {
+                                        audioSelect.selectedIndex = index;
+                                        audioSelect.dispatchEvent(new Event('change'));
+                                    }
+                                }
                             }
                         }
                     } catch (error) {
