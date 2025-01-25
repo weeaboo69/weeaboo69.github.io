@@ -416,39 +416,22 @@
 
         async function setupRecording() {
             try {
-                const mainContext = wave.context;
-                const combinedDestination = mainContext.createMediaStreamDestination();
+                if (!wave || !wave.context) return;
 
-                // 將所有音訊源連接到同一個目標
-                wave.gainNode.connect(combinedDestination);
-                if (wheelWave && wheelWave.gainNode) {
-                    wheelWave.gainNode.connect(combinedDestination);
-                }
-                if (wheelWave2 && wheelWave2.gainNode) {
-                    wheelWave2.gainNode.connect(combinedDestination);
-                }
+                const mainStream = wave.context.createMediaStreamDestination();
+                wave.gainNode.connect(mainStream);
 
-                const stream = combinedDestination.stream;
-                mediaRecorder = new MediaRecorder(stream);
-
-                // 其餘的 mediaRecorder 設置保持不變
+                mediaRecorder = new MediaRecorder(mainStream.stream);
                 mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        recordedChunks.push(event.data);
-                    }
+                    if (event.data.size > 0) recordedChunks.push(event.data);
                 };
 
                 mediaRecorder.onstop = () => {
                     const blob = new Blob(recordedChunks, { type: 'audio/webm' });
-                    const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
+                    a.href = URL.createObjectURL(blob);
                     a.download = 'recorded_audio.webm';
-                    document.body.appendChild(a);
                     a.click();
-                    URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
                 };
 
                 recordBtn.disabled = false;
