@@ -378,7 +378,6 @@
 
         // 其他基本功能保持不變...
         function initVisualizer(mode = 'default') {
-            // 如果主要的 wave 不存在，先創建它
             if (!wave) {
                 wave = new CircularAudioWave(document.getElementById('chart-container'), {
                     mode: mode,
@@ -387,14 +386,16 @@
                 window.wave = wave;
             }
 
-            // 初始化兩個輪子的音效，使用相同的 AudioContext
+            // 使用主要 wave 的 AudioContext
+            const mainContext = wave.context;
+
             if (!wheelWave) {
                 const hiddenContainer = document.createElement('div');
                 hiddenContainer.style.display = 'none';
                 document.body.appendChild(hiddenContainer);
                 wheelWave = new CircularAudioWave(hiddenContainer, {
                     loop: true,
-                    context: wave.context  // 使用主要 wave 的 context
+                    context: mainContext  // 使用主要 wave 的 context
                 });
                 window.wheelWave = wheelWave;
                 wheelWave.loadAudio('audio/wheel_sound.mp3');
@@ -406,7 +407,7 @@
                 document.body.appendChild(hiddenContainer2);
                 wheelWave2 = new CircularAudioWave(hiddenContainer2, {
                     loop: true,
-                    context: wave.context  // 使用主要 wave 的 context
+                    context: mainContext  // 使用主要 wave 的 context
                 });
                 window.wheelWave2 = wheelWave2;
                 wheelWave2.loadAudio('audio/wheel_sound2.mp3');
