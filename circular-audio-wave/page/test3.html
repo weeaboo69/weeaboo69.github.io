@@ -416,43 +416,22 @@
 
         async function setupRecording() {
             try {
-                // 使用主要的 AudioContext
                 const mainContext = wave.context;
+                const combinedDestination = mainContext.createMediaStreamDestination();
 
-                const mainDestination = mainContext.createMediaStreamDestination();
-                const wheelDestination = mainContext.createMediaStreamDestination();
-                const wheel2Destination = mainContext.createMediaStreamDestination();
-
-                // 連接主要音樂
-                wave.gainNode.connect(mainDestination);
-
-                // 連接兩個輪子音效
+                // 將所有音訊源連接到同一個目標
+                wave.gainNode.connect(combinedDestination);
                 if (wheelWave && wheelWave.gainNode) {
-                    wheelWave.gainNode.connect(wheelDestination);
+                    wheelWave.gainNode.connect(combinedDestination);
                 }
                 if (wheelWave2 && wheelWave2.gainNode) {
-                    wheelWave2.gainNode.connect(wheel2Destination);
+                    wheelWave2.gainNode.connect(combinedDestination);
                 }
 
-                // 確保所有音源都連接到揚聲器
-                wave.gainNode.connect(mainContext.destination);
-                if (wheelWave && wheelWave.gainNode) {
-                    wheelWave.gainNode.connect(mainContext.destination);
-                }
-                if (wheelWave2 && wheelWave2.gainNode) {
-                    wheelWave2.gainNode.connect(mainContext.destination);
-                }
+                const stream = combinedDestination.stream;
+                mediaRecorder = new MediaRecorder(stream);
 
-                // 合併所有音軌
-                const combinedTracks = [
-                    ...mainDestination.stream.getAudioTracks(),
-                    ...wheelDestination.stream.getAudioTracks(),
-                    ...wheel2Destination.stream.getAudioTracks()
-                ];
-
-                const combinedStream = new MediaStream(combinedTracks);
-                mediaRecorder = new MediaRecorder(combinedStream);
-
+                // 其餘的 mediaRecorder 設置保持不變
                 mediaRecorder.ondataavailable = (event) => {
                     if (event.data.size > 0) {
                         recordedChunks.push(event.data);
