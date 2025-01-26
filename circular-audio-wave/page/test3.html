@@ -418,8 +418,18 @@
             try {
                 if (!wave || !wave.context) return;
 
-                const mainStream = wave.context.createMediaStreamDestination();
+                const mainContext = wave.context;
+                const mainStream = mainContext.createMediaStreamDestination();
+
+                // 連接所有音源到錄音目標
                 wave.gainNode.connect(mainStream);
+                wheelWave?.gainNode?.connect(mainStream);
+                wheelWave2?.gainNode?.connect(mainStream);
+
+                // 確保連接到揚聲器
+                wave.gainNode.connect(mainContext.destination);
+                wheelWave?.gainNode?.connect(mainContext.destination);
+                wheelWave2?.gainNode?.connect(mainContext.destination);
 
                 mediaRecorder = new MediaRecorder(mainStream.stream);
                 mediaRecorder.ondataavailable = (event) => {
