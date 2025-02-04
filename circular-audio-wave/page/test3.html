@@ -67,6 +67,15 @@
             background: #38a169;
         }
 
+        .connect-btn.horn {
+            background: #9333ea;
+            /* 紫色系 */
+        }
+
+        .connect-btn.horn:hover {
+            background: #7e22ce;
+        }
+
         /* 調整 controls 的樣式確保按鈕對齊 */
         .controls {
             background: #2d2d2d;
@@ -658,7 +667,8 @@
             const [devices, setDevices] = useState({
                 wheel: null,
                 wheel2: null,
-                playlist: null
+                playlist: null,
+                horn: null
             });
 
             const connectDevice = async (type) => {
@@ -816,6 +826,12 @@
                         >
                             連接轉速控制器2
                         </button>
+                        <button
+                            onClick={() => connectDevice('horn')}
+                            className="connect-btn horn"  // 新增喇叭按鈕樣式
+                        >
+                            連接喇叭控制器
+                        </button>
                     </div>
 
                     {devices.wheel && (
@@ -853,6 +869,19 @@
                             </div>
                             <button
                                 onClick={() => disconnectDevice('wheel2')}
+                                className="text-red-400 hover:text-red-300"
+                            >
+                                中斷連接
+                            </button>
+                        </div>
+                    )}
+                    {devices.horn && (
+                        <div className="bg-gray-700 p-3 rounded mb-2">
+                            <div className="text-white">
+                                喇叭控制器已連接
+                            </div>
+                            <button
+                                onClick={() => disconnectDevice('horn')}
                                 className="text-red-400 hover:text-red-300"
                             >
                                 中斷連接
