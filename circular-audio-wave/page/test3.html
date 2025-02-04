@@ -670,6 +670,22 @@
                 playlist: null,
                 horn: null
             });
+            const [showControls, setShowControls] = useState(false);
+
+            const deviceOptions = [
+                { value: "", label: "選擇要連接的裝置" },
+                { value: "wheel", label: "轉速控制器" },
+                { value: "wheel2", label: "轉速控制器 2" },
+                { value: "playlist", label: "歌單控制器" },
+                { value: "horn", label: "喇叭控制器" }
+            ];
+
+            const handleDeviceSelect = async (e) => {
+                const selectedValue = e.target.value;
+                if (selectedValue) {
+                    await connectDevice(selectedValue);
+                }
+            };
 
             const connectDevice = async (type) => {
                 try {
@@ -811,87 +827,35 @@
 
             return (
                 <div className="p-4">
-                    <div className="flex gap-4 mb-4 justify-center">
-                        <button
-                            onClick={() => connectDevice('wheel')}
-                            className="connect-btn wheel"
+                    <div className="flex flex-col gap-4 mb-4">
+                        <select
+                            onChange={handleDeviceSelect}
+                            className="select bg-gray-700 text-white p-2 rounded cursor-pointer hover:bg-gray-600"
                         >
-                            連接轉速控制器
-                        </button>
-                        <button
-                            onClick={() => connectDevice('playlist')}
-                            className="connect-btn playlist"
-                        >
-                            連接歌單控制器
-                        </button>
-                        <button
-                            onClick={() => connectDevice('wheel2')}
-                            className="connect-btn wheel2"
-                        >
-                            連接轉速控制器2
-                        </button>
-                        <button
-                            onClick={() => connectDevice('horn')}
-                            className="connect-btn horn"  // 新增喇叭按鈕樣式
-                        >
-                            連接喇叭控制器
-                        </button>
+                            {deviceOptions.map(option => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+
+                        {/* 已連接設備顯示區域 */}
+                        {Object.entries(devices).map(([type, device]) =>
+                            device && (
+                                <div key={type} className="bg-gray-700 p-3 rounded mb-2">
+                                    <div className="text-white">
+                                        {deviceOptions.find(opt => opt.value === type)?.label}已連接
+                                    </div>
+                                    <button
+                                        onClick={() => disconnectDevice(type)}
+                                        className="text-red-400 hover:text-red-300"
+                                    >
+                                        中斷連接
+                                    </button>
+                                </div>
+                            )
+                        )}
                     </div>
-
-                    {devices.wheel && (
-                        <div className="bg-gray-700 p-3 rounded mb-2">
-                            <div className="text-white">
-                                轉速控制器已連接
-                            </div>
-                            <button
-                                onClick={() => disconnectDevice('wheel')}
-                                className="text-red-400 hover:text-red-300"
-                            >
-                                中斷連接
-                            </button>
-                        </div>
-                    )}
-
-                    {devices.playlist && (
-                        <div className="bg-gray-700 p-3 rounded mb-2">
-                            <div className="text-white">
-                                歌單控制器已連接
-                            </div>
-                            <button
-                                onClick={() => disconnectDevice('playlist')}
-                                className="text-red-400 hover:text-red-300"
-                            >
-                                中斷連接
-                            </button>
-                        </div>
-                    )}
-
-                    {devices.wheel2 && (
-                        <div className="bg-gray-700 p-3 rounded mb-2">
-                            <div className="text-white">
-                                轉速控制器 2 已連接
-                            </div>
-                            <button
-                                onClick={() => disconnectDevice('wheel2')}
-                                className="text-red-400 hover:text-red-300"
-                            >
-                                中斷連接
-                            </button>
-                        </div>
-                    )}
-                    {devices.horn && (
-                        <div className="bg-gray-700 p-3 rounded mb-2">
-                            <div className="text-white">
-                                喇叭控制器已連接
-                            </div>
-                            <button
-                                onClick={() => disconnectDevice('horn')}
-                                className="text-red-400 hover:text-red-300"
-                            >
-                                中斷連接
-                            </button>
-                        </div>
-                    )}
                 </div>
             );
         }
