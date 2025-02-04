@@ -796,26 +796,29 @@
                                         audioSelect.dispatchEvent(new Event('change'));
                                     }
                                 }
-                            } if (type === 'horn') {
+                            } else if (type === 'horn') {
                                 const command = line.trim();
                                 if (command === 'PLAY_HORN') {
                                     console.log('收到喇叭指令');
-                                    if (window.hornWave) {
+                                    if (window.wave && window.hornWave) {
                                         try {
-                                            // 如果正在播放，先停止
+                                            // 如果正在播放，只需停止，不要銷毀
                                             if (window.hornWave.playing) {
-                                                window.hornWave.destroy();
+                                                window.hornWave.sourceNode.stop();
+                                                window.hornWave.playing = false;
                                             }
+
                                             // 創建新的容器
                                             const hiddenContainer3 = document.createElement('div');
                                             hiddenContainer3.style.display = 'none';
                                             document.body.appendChild(hiddenContainer3);
 
-                                            // 重新創建並播放
+                                            // 使用主要的 context 創建新的 hornWave
                                             window.hornWave = new CircularAudioWave(hiddenContainer3, {
                                                 loop: false,
-                                                context: wave.context
+                                                context: window.wave.context  // 使用主要的 context
                                             });
+
                                             window.hornWave.loadAudio('audio/horn_sound.mp3').then(() => {
                                                 window.hornWave.play();
                                             });
