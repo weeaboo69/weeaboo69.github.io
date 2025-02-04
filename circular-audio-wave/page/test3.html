@@ -800,33 +800,40 @@
                                 const command = line.trim();
                                 if (command === 'PLAY_HORN') {
                                     console.log('收到喇叭指令');
-                                    if (window.wave && window.wave.context && window.wave.context.state !== 'closed') {
-                                        try {
-                                            // 創建新的容器
-                                            const hiddenContainer3 = document.createElement('div');
-                                            hiddenContainer3.style.display = 'none';
-                                            document.body.appendChild(hiddenContainer3);
 
-                                            // 重新創建並播放
-                                            const newHornWave = new CircularAudioWave(hiddenContainer3, {
-                                                loop: false,
-                                                context: window.wave.context
-                                            });
+                                    // 檢查主要 wave 和 context 的狀態
+                                    if (!window.wave || !window.wave.context || window.wave.context.state === 'closed') {
+                                        console.log('重新初始化 AudioContext');
+                                        // 重新初始化主要的 wave
+                                        const audioElement = document.getElementById('chart-container');
+                                        window.wave = new CircularAudioWave(audioElement, {
+                                            mode: modeSelect.value,
+                                            loop: true
+                                        });
+                                    }
 
-                                            // 等待 context 準備好
-                                            if (window.wave.context.state === 'suspended') {
-                                                await window.wave.context.resume();
-                                            }
-
-                                            newHornWave.loadAudio('audio/horn_sound.mp3').then(() => {
-                                                newHornWave.play();
-                                                window.hornWave = newHornWave;
-                                            });
-                                        } catch (err) {
-                                            console.error('喇叭音效播放失敗:', err);
+                                    try {
+                                        // 確保 context 是活躍的
+                                        if (window.wave.context.state === 'suspended') {
+                                            await window.wave.context.resume();
                                         }
-                                    } else {
-                                        console.log('主要 AudioContext 已關閉或不可用');
+
+                                        // 創建新的容器
+                                        const hiddenContainer3 = document.createElement('div');
+                                        hiddenContainer3.style.display = 'none';
+                                        document.body.appendChild(hiddenContainer3);
+
+                                        // 使用現有的 context 創建新的喇叭音效
+                                        window.hornWave = new CircularAudioWave(hiddenContainer3, {
+                                            loop: false,
+                                            context: window.wave.context
+                                        });
+
+                                        await window.hornWave.loadAudio('audio/horn_sound.mp3');
+                                        window.hornWave.play();
+
+                                    } catch (err) {
+                                        console.error('喇叭音效播放失敗:', err);
                                     }
                                 }
                             }
