@@ -428,7 +428,7 @@
                 document.body.appendChild(hiddenContainer3);
                 hornWave = new CircularAudioWave(hiddenContainer3, {
                     loop: false,
-                    context: wave.context
+                    context: mainContext  // 使用主要 wave 的 context
                 });
                 window.hornWave = hornWave;
                 hornWave.loadAudio('audio/horn_sound.mp3');
@@ -748,7 +748,6 @@
                                     const speedValue = lineLength / 100;
                                     if (window.wheelWave && window.wheelWave.sourceNode) {
                                         window.wheelWave.sourceNode.playbackRate.value = speedValue;
-                                        // 修改這裡的播放邏輯
                                         if (!window.wheelWave.playing) {
                                             try {
                                                 window.wheelWave.play();
@@ -763,7 +762,6 @@
                                 if (!isNaN(speedValue)) {
                                     if (window.wheelWave2 && window.wheelWave2.sourceNode) {
                                         window.wheelWave2.sourceNode.playbackRate.value = speedValue;
-                                        // 修改這裡的播放邏輯
                                         if (!window.wheelWave2.playing) {
                                             try {
                                                 window.wheelWave2.play();
@@ -774,7 +772,6 @@
                                     }
                                 }
                             } else if (type === 'playlist') {
-                                // 歌單控制邏輯保持不變
                                 const command = line.trim();
                                 if (command === 'SELECT_MUSIC_1' ||
                                     command === 'SELECT_MUSIC_2' ||
@@ -791,35 +788,16 @@
                                 const command = line.trim();
                                 if (command === 'PLAY_HORN') {
                                     console.log('收到喇叭指令');
-                                    if (window.wave && window.wave.context) {
+                                    if (window.hornWave) {
                                         try {
-                                            // 如果目前有正在播放的喇叭音效，直接停止它
-                                            if (window.hornWave && window.hornWave.playing) {
-                                                window.hornWave.sourceNode.stop();
-                                                window.hornWave.playing = false;
-                                            }
-
-                                            // 重新載入音效並播放，但不要銷毀舊的 context
-                                            window.hornWave = new CircularAudioWave(document.createElement('div'), {
-                                                loop: false,
-                                                context: window.wave.context
-                                            });
-
-                                            window.hornWave.loadAudio('audio/horn_sound.mp3').then(() => {
-                                                if (window.wave.context.state === 'suspended') {
-                                                    window.wave.context.resume().then(() => {
-                                                        window.hornWave.play();
-                                                    });
-                                                } else {
-                                                    window.hornWave.play();
-                                                }
-                                            });
-
+                                            const currentContext = window.wave.context;
+                                            const sourceNode = currentContext.createBufferSource();
+                                            sourceNode.buffer = window.hornWave._currentBuffer;
+                                            sourceNode.connect(currentContext.destination);
+                                            sourceNode.start(0);
                                         } catch (err) {
                                             console.error('喇叭音效播放失敗:', err);
                                         }
-                                    } else {
-                                        console.log('AudioContext 不可用');
                                     }
                                 }
                             }
