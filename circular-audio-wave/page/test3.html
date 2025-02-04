@@ -687,6 +687,14 @@
                 }
             };
 
+            if (!isSupported) {
+                return (
+                    <div className="p-4 bg-red-500 text-white rounded">
+                        您的瀏覽器不支援藍牙連接功能，請使用支援的瀏覽器（如 Chrome）。
+                    </div>
+                );
+            }
+
             const connectDevice = async (type) => {
                 try {
                     const port = await navigator.serial.requestPort();
@@ -844,7 +852,7 @@
                             device && (
                                 <div key={type} className="bg-gray-700 p-3 rounded mb-2">
                                     <div className="text-white">
-                                        {deviceOptions.find(opt => opt.value === type)?.label}已連接
+                                        {getDeviceLabel(type)}已連接
                                     </div>
                                     <button
                                         onClick={() => disconnectDevice(type)}
@@ -859,6 +867,8 @@
                 </div>
             );
         }
+
+        export default MultiController;
 
         window.onload = function () {
             const container = document.getElementById('serial-controls');
