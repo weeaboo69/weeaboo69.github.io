@@ -428,14 +428,10 @@
                 document.body.appendChild(hiddenContainer3);
                 hornWave = new CircularAudioWave(hiddenContainer3, {
                     loop: false,
-                    context: wave ? wave.context : new AudioContext()
+                    context: wave.context
                 });
                 window.hornWave = hornWave;
-                hornWave.loadAudio('audio/horn_sound.mp3').then(() => {
-                    console.log('喇叭音效載入成功');  // 用於除錯
-                }).catch(err => {
-                    console.error('喇叭音效載入失敗:', err);  // 用於除錯
-                });
+                hornWave.loadAudio('audio/horn_sound.mp3');
             }
         }
 
@@ -803,117 +799,120 @@
                             } else if (type === 'horn') {
                                 const command = line.trim();
                                 if (command === 'PLAY_HORN') {
-                                    console.log('收到喇叭指令');  // 用於除錯
+                                    console.log('收到喇叭指令');
                                     if (window.hornWave) {
                                         try {
-                                            // 如果正在播放，先重置
+                                            // 如果正在播放，先停止
                                             if (window.hornWave.playing) {
                                                 window.hornWave.destroy();
-                                                window.hornWave.loadAudio('audio/horn_sound.mp3');
                                             }
-                                            window.hornWave.play();
-                                            console.log('喇叭音效播放成功');  // 用於除錯
+                                            // 重新創建並播放
+                                            window.hornWave = new CircularAudioWave(hiddenContainer3, {
+                                                loop: false,
+                                                context: wave.context
+                                            });
+                                            window.hornWave.loadAudio('audio/horn_sound.mp3').then(() => {
+                                                window.hornWave.play();
+                                            });
                                         } catch (err) {
                                             console.error('喇叭音效播放失敗:', err);
                                         }
-                                    } else {
-                                        console.error('hornWave 未初始化');  // 用於除錯
                                     }
-                                }
                             }
                         }
-                    } catch (error) {
-                        console.error('Read error:', error);
-                        break;
                     }
+                    } catch (error) {
+                    console.error('Read error:', error);
+                    break;
                 }
-            };
+            }
+        };
 
-            return (
-                <div className="p-4">
-                    <div className="flex gap-4 mb-4 justify-center">
+        return (
+            <div className="p-4">
+                <div className="flex gap-4 mb-4 justify-center">
+                    <button
+                        onClick={() => connectDevice('wheel')}
+                        className="connect-btn wheel"
+                    >
+                        連接轉速控制器
+                    </button>
+                    <button
+                        onClick={() => connectDevice('playlist')}
+                        className="connect-btn playlist"
+                    >
+                        連接歌單控制器
+                    </button>
+                    <button
+                        onClick={() => connectDevice('wheel2')}
+                        className="connect-btn wheel2"
+                    >
+                        連接轉速控制器2
+                    </button>
+                    <button
+                        onClick={() => connectDevice('horn')}
+                        className="connect-btn horn"  // 新增喇叭按鈕樣式
+                    >
+                        連接喇叭控制器
+                    </button>
+                </div>
+
+                {devices.wheel && (
+                    <div className="bg-gray-700 p-3 rounded mb-2">
+                        <div className="text-white">
+                            轉速控制器已連接
+                        </div>
                         <button
-                            onClick={() => connectDevice('wheel')}
-                            className="connect-btn wheel"
+                            onClick={() => disconnectDevice('wheel')}
+                            className="text-red-400 hover:text-red-300"
                         >
-                            連接轉速控制器
-                        </button>
-                        <button
-                            onClick={() => connectDevice('playlist')}
-                            className="connect-btn playlist"
-                        >
-                            連接歌單控制器
-                        </button>
-                        <button
-                            onClick={() => connectDevice('wheel2')}
-                            className="connect-btn wheel2"
-                        >
-                            連接轉速控制器2
-                        </button>
-                        <button
-                            onClick={() => connectDevice('horn')}
-                            className="connect-btn horn"  // 新增喇叭按鈕樣式
-                        >
-                            連接喇叭控制器
+                            中斷連接
                         </button>
                     </div>
+                )}
 
-                    {devices.wheel && (
-                        <div className="bg-gray-700 p-3 rounded mb-2">
-                            <div className="text-white">
-                                轉速控制器已連接
-                            </div>
-                            <button
-                                onClick={() => disconnectDevice('wheel')}
-                                className="text-red-400 hover:text-red-300"
-                            >
-                                中斷連接
-                            </button>
+                {devices.playlist && (
+                    <div className="bg-gray-700 p-3 rounded mb-2">
+                        <div className="text-white">
+                            歌單控制器已連接
                         </div>
-                    )}
+                        <button
+                            onClick={() => disconnectDevice('playlist')}
+                            className="text-red-400 hover:text-red-300"
+                        >
+                            中斷連接
+                        </button>
+                    </div>
+                )}
 
-                    {devices.playlist && (
-                        <div className="bg-gray-700 p-3 rounded mb-2">
-                            <div className="text-white">
-                                歌單控制器已連接
-                            </div>
-                            <button
-                                onClick={() => disconnectDevice('playlist')}
-                                className="text-red-400 hover:text-red-300"
-                            >
-                                中斷連接
-                            </button>
+                {devices.wheel2 && (
+                    <div className="bg-gray-700 p-3 rounded mb-2">
+                        <div className="text-white">
+                            轉速控制器 2 已連接
                         </div>
-                    )}
-
-                    {devices.wheel2 && (
-                        <div className="bg-gray-700 p-3 rounded mb-2">
-                            <div className="text-white">
-                                轉速控制器 2 已連接
-                            </div>
-                            <button
-                                onClick={() => disconnectDevice('wheel2')}
-                                className="text-red-400 hover:text-red-300"
-                            >
-                                中斷連接
-                            </button>
+                        <button
+                            onClick={() => disconnectDevice('wheel2')}
+                            className="text-red-400 hover:text-red-300"
+                        >
+                            中斷連接
+                        </button>
+                    </div>
+                )}
+                {devices.horn && (
+                    <div className="bg-gray-700 p-3 rounded mb-2">
+                        <div className="text-white">
+                            喇叭控制器已連接
                         </div>
-                    )}
-                    {devices.horn && (
-                        <div className="bg-gray-700 p-3 rounded mb-2">
-                            <div className="text-white">
-                                喇叭控制器已連接
-                            </div>
-                            <button
-                                onClick={() => disconnectDevice('horn')}
-                                className="text-red-400 hover:text-red-300"
-                            >
-                                中斷連接
-                            </button>
-                        </div>
-                    )}
-                </div>
-            );
+                        <button
+                            onClick={() => disconnectDevice('horn')}
+                            className="text-red-400 hover:text-red-300"
+                        >
+                            中斷連接
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
         }
 
         window.onload = function () {
