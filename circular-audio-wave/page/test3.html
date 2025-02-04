@@ -776,15 +776,6 @@
                             } else if (type === 'playlist') {
                                 // 歌單控制邏輯保持不變
                                 const command = line.trim();
-                                if (command === 'PLAY_HORN') { // 新增這個判斷
-                                    if (window.hornWave) {
-                                        try {
-                                            window.hornWave.play();
-                                        } catch (err) {
-                                            console.error('喇叭音效播放失敗:', err);
-                                        }
-                                    }
-                                }
                                 if (command === 'SELECT_MUSIC_1' ||
                                     command === 'SELECT_MUSIC_2' ||
                                     command === 'SELECT_MUSIC_3') {
@@ -800,40 +791,35 @@
                                 const command = line.trim();
                                 if (command === 'PLAY_HORN') {
                                     console.log('收到喇叭指令');
+                                    if (window.wave && window.wave.context) {
+                                        try {
+                                            // 如果目前有正在播放的喇叭音效，直接停止它
+                                            if (window.hornWave && window.hornWave.playing) {
+                                                window.hornWave.sourceNode.stop();
+                                                window.hornWave.playing = false;
+                                            }
 
-                                    // 檢查主要 wave 和 context 的狀態
-                                    if (!window.wave || !window.wave.context || window.wave.context.state === 'closed') {
-                                        console.log('重新初始化 AudioContext');
-                                        // 重新初始化主要的 wave
-                                        const audioElement = document.getElementById('chart-container');
-                                        window.wave = new CircularAudioWave(audioElement, {
-                                            mode: modeSelect.value,
-                                            loop: true
-                                        });
-                                    }
+                                            // 重新載入音效並播放，但不要銷毀舊的 context
+                                            window.hornWave = new CircularAudioWave(document.createElement('div'), {
+                                                loop: false,
+                                                context: window.wave.context
+                                            });
 
-                                    try {
-                                        // 確保 context 是活躍的
-                                        if (window.wave.context.state === 'suspended') {
-                                            await window.wave.context.resume();
+                                            window.hornWave.loadAudio('audio/horn_sound.mp3').then(() => {
+                                                if (window.wave.context.state === 'suspended') {
+                                                    window.wave.context.resume().then(() => {
+                                                        window.hornWave.play();
+                                                    });
+                                                } else {
+                                                    window.hornWave.play();
+                                                }
+                                            });
+
+                                        } catch (err) {
+                                            console.error('喇叭音效播放失敗:', err);
                                         }
-
-                                        // 創建新的容器
-                                        const hiddenContainer3 = document.createElement('div');
-                                        hiddenContainer3.style.display = 'none';
-                                        document.body.appendChild(hiddenContainer3);
-
-                                        // 使用現有的 context 創建新的喇叭音效
-                                        window.hornWave = new CircularAudioWave(hiddenContainer3, {
-                                            loop: false,
-                                            context: window.wave.context
-                                        });
-
-                                        await window.hornWave.loadAudio('audio/horn_sound.mp3');
-                                        window.hornWave.play();
-
-                                    } catch (err) {
-                                        console.error('喇叭音效播放失敗:', err);
+                                    } else {
+                                        console.log('AudioContext 不可用');
                                     }
                                 }
                             }
