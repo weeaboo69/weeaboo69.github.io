@@ -379,7 +379,6 @@
 
         // 其他基本功能保持不變...
         function initVisualizer(mode = 'default') {
-            // 如果主要的 wave 不存在，先創建它
             if (!wave) {
                 wave = new CircularAudioWave(document.getElementById('chart-container'), {
                     mode: mode,
@@ -388,14 +387,16 @@
                 window.wave = wave;
             }
 
-            // 初始化兩個輪子的音效，使用相同的 AudioContext
+            // 使用主要 wave 的 AudioContext
+            const mainContext = wave.context;
+
             if (!wheelWave) {
                 const hiddenContainer = document.createElement('div');
                 hiddenContainer.style.display = 'none';
                 document.body.appendChild(hiddenContainer);
                 wheelWave = new CircularAudioWave(hiddenContainer, {
                     loop: true,
-                    context: wave.context  // 使用主要 wave 的 context
+                    context: mainContext  // 使用主要 wave 的 context
                 });
                 window.wheelWave = wheelWave;
                 wheelWave.loadAudio('audio/wheel_sound.mp3');
@@ -407,7 +408,7 @@
                 document.body.appendChild(hiddenContainer2);
                 wheelWave2 = new CircularAudioWave(hiddenContainer2, {
                     loop: true,
-                    context: wave.context  // 使用主要 wave 的 context
+                    context: mainContext  // 使用主要 wave 的 context
                 });
                 window.wheelWave2 = wheelWave2;
                 wheelWave2.loadAudio('audio/wheel_sound2.mp3');
@@ -427,8 +428,11 @@
 
         async function setupRecording() {
             try {
-                // 使用主要的 AudioContext
+                if (!wave || !wave.context) return;
+
                 const mainContext = wave.context;
+                const mainStream = mainContext.createMediaStreamDestination();
+
 
                 const mainDestination = mainContext.createMediaStreamDestination();
                 const wheelDestination = mainContext.createMediaStreamDestination();
@@ -469,23 +473,28 @@
                 const combinedStream = new MediaStream(combinedTracks);
                 mediaRecorder = new MediaRecorder(combinedStream);
 
+                // 連接所有音源到錄音目標
+                wave.gainNode.connect(mainStream);
+                wheelWave?.gainNode?.connect(mainStream);
+                wheelWave2?.gainNode?.connect(mainStream);
+
+                // 確保連接到揚聲器
+                wave.gainNode.connect(mainContext.destination);
+                wheelWave?.gainNode?.connect(mainContext.destination);
+                wheelWave2?.gainNode?.connect(mainContext.destination);
+
+
+                mediaRecorder = new MediaRecorder(mainStream.stream);
                 mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        recordedChunks.push(event.data);
-                    }
+                    if (event.data.size > 0) recordedChunks.push(event.data);
                 };
 
                 mediaRecorder.onstop = () => {
                     const blob = new Blob(recordedChunks, { type: 'audio/webm' });
-                    const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
+                    a.href = URL.createObjectURL(blob);
                     a.download = 'recorded_audio.webm';
-                    document.body.appendChild(a);
                     a.click();
-                    URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
                 };
 
                 recordBtn.disabled = false;
@@ -557,7 +566,7 @@
                 stopBtn.disabled = false;
 
                 // 重新設置錄音
-                await setupRecording();
+                setupRecording();
 
             } catch (err) {
                 status.textContent = '載入音樂失敗';

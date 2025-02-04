@@ -12,131 +12,106 @@ class CircularAudioWave {
         this.startTime = 0;
         this.pausedAt = 0;
         this.playbackRate = 1;
-        this.minPlaybackRate = 0.5;  // 最慢速度
-        this.maxPlaybackRate = 1.0;  // 最快速度
+        this.minPlaybackRate = 0.5;
+        this.maxPlaybackRate = 1.0;
 
         let bgColor = '#2E2733';
         this.defaultChartOption = {
             angleAxis: {
                 type: 'value',
                 clockwise: false,
-                axisLine: {
-                    show: false,
-                },
-                axisTick: {
-                    show: false,
-                },
-                axisLabel: {
-                    show: false,
-                },
-                splitLine: {
-                    show: false,
-                },
+                axisLine: { show: false },
+                axisTick: { show: false },
+                axisLabel: { show: false },
+                splitLine: { show: false }
             },
             radiusAxis: {
                 min: 0,
                 max: this.maxChartValue + 50,
-                axisLine: {
-                    show: false,
-                },
-                axisTick: {
-                    show: false,
-                },
-                axisLabel: {
-                    show: false,
-                },
-                splitLine: {
-                    show: false,
-                },
+                axisLine: { show: false },
+                axisTick: { show: false },
+                axisLabel: { show: false },
+                splitLine: { show: false }
             },
-            polar: {
-                radius: '100%',
-            },
+            polar: { radius: '100%' },
             series: [{
-                    coordinateSystem: 'polar',
-                    name: 'line',
-                    type: 'line',
-                    showSymbol: false,
-                    lineStyle: {
-                        color: {
-                            colorStops: [{
-                                    offset: 0.7,
-                                    color: '#e91e63'
-                                },
-                                {
-                                    offset: 0.3,
-                                    color: '#3f51b5'
-                                }
-                            ],
-                        },
-                        shadowColor: 'blue',
-                        shadowBlur: 10,
+                coordinateSystem: 'polar',
+                name: 'line',
+                type: 'line',
+                showSymbol: false,
+                lineStyle: {
+                    color: {
+                        colorStops: [{
+                            offset: 0.7,
+                            color: '#e91e63'
+                        }, {
+                            offset: 0.3,
+                            color: '#3f51b5'
+                        }]
                     },
-                    zlevel: 2,
-                    data: Array.apply(null, {
-                        length: 361
-                    }).map(Function.call, i => {
-                        return [this.minChartValue, i];
-                    }),
-                    silent: true,
-                    hoverAnimation: false,
+                    shadowColor: 'blue',
+                    shadowBlur: 10
                 },
-                {
-                    coordinateSystem: 'polar',
-                    name: 'maxbar',
-                    type: 'line',
-                    showSymbol: false,
-                    lineStyle: {
-                        color: '#87b9ca',
-                        shadowColor: '#87b9ca',
-                        shadowBlur: 10,
-                    },
-                    data: Array.apply(null, {
-                        length: 361
-                    }).map(Function.call, i => {
-                        return [this.minChartValue, i];
-                    }),
-                    silent: true,
-                    hoverAnimation: false,
+                zlevel: 2,
+                data: Array.apply(null, { length: 361 }).map(Function.call, i => {
+                    return [this.minChartValue, i];
+                }),
+                silent: true,
+                hoverAnimation: false
+            },
+            {
+                coordinateSystem: 'polar',
+                name: 'maxbar',
+                type: 'line',
+                showSymbol: false,
+                lineStyle: {
+                    color: '#87b9ca',
+                    shadowColor: '#87b9ca',
+                    shadowBlur: 10
                 },
-                {
-                    coordinateSystem: 'polar',
-                    name: 'interior',
-                    type: 'effectScatter',
-                    showSymbol: false,
-                    data: [0],
-                    symbolSize: 100,
-                    rippleEffect: {
-                        period: 3.5,
-                        scale: 3,
-                    },
-                    itemStyle: {
-                        color: {
-                            type: 'radial',
-                            colorStops: [{
-                                offset: 0,
-                                color: '#87b9ca'
-                            }, {
-                                offset: 1,
-                                color: 'white'
-                            }],
-                        },
-                    },
-                    silent: true,
-                    hoverAnimation: false,
-                    animation: false,
+                data: Array.apply(null, { length: 361 }).map(Function.call, i => {
+                    return [this.minChartValue, i];
+                }),
+                silent: true,
+                hoverAnimation: false
+            },
+            {
+                coordinateSystem: 'polar',
+                name: 'interior',
+                type: 'effectScatter',
+                showSymbol: false,
+                data: [0],
+                symbolSize: 100,
+                rippleEffect: {
+                    period: 3.5,
+                    scale: 3
                 },
-            ]
+                itemStyle: {
+                    color: {
+                        type: 'radial',
+                        colorStops: [{
+                            offset: 0,
+                            color: '#87b9ca'
+                        }, {
+                            offset: 1,
+                            color: 'white'
+                        }]
+                    }
+                },
+                silent: true,
+                hoverAnimation: false,
+                animation: false
+            }]
         };
-        // check if the default naming is enabled, if not use the chrome one.
+
         window.AudioContext = window.AudioContext || window.webkitAudioContext;
         window.OfflineAudioContext = window.OfflineAudioContext || window.webkitOfflineAudioContext;
 
         if (!window.AudioContext) {
             alert('Your browser does not support Web Audio API');
         } else {
-            this.context = new AudioContext();
-            this.offlineContext = new OfflineAudioContext(2, 30 * 44100, 44100);
+            this.context = opts.context || new AudioContext();
+            this.offlineContext = new OfflineAudioContext(2, 30 * this.context.sampleRate, this.context.sampleRate);
             this.sourceNode = this.context.createBufferSource();
             this.offlineSource = this.offlineContext.createBufferSource();
             this.sourceNode.loop = !!this.opts.loop;
@@ -148,15 +123,15 @@ class CircularAudioWave {
             let colors = ['#FFAE57', '#FF7853', '#EA5151', '#CC3F57', '#9A2555'];
 
             let data = [{
-                    children: [{
-                        children: []
-                    }],
-                },
-                {
-                    children: [{
-                        children: []
-                    }],
-                },
+                children: [{
+                    children: []
+                }],
+            },
+            {
+                children: [{
+                    children: []
+                }],
+            },
             ];
             for (let i = 0; i < 5; i++) {
                 data[0].children[0].children.push({
@@ -164,13 +139,13 @@ class CircularAudioWave {
                     children: [{
                         name: ''
                     }]
-                }, );
+                },);
                 data[1].children[0].children.push({
                     name: '-',
                     children: [{
                         name: ''
                     }]
-                }, );
+                },);
             }
 
             // loop to the bottom children
@@ -284,7 +259,7 @@ class CircularAudioWave {
     setPlaybackRate(rate) {
         // 確保速度在允許的範圍內
         rate = Math.max(this.minPlaybackRate, Math.min(rate, this.maxPlaybackRate));
-        
+
         this.currentPlaybackRate = rate;
         if (this.sourceNode && this.sourceNode.playbackRate) {
             this.sourceNode.playbackRate.value = rate;
@@ -296,7 +271,7 @@ class CircularAudioWave {
         if (this.sourceNode && this.sourceNode.buffer) {
             this.playing = true;
             this.presetOption();
-            
+
             // 如果是從暫停狀態恢復
             if (this.pausedAt) {
                 this.startTime = this.context.currentTime - this.pausedAt;
@@ -305,12 +280,12 @@ class CircularAudioWave {
                 this.startTime = this.context.currentTime;
                 this.sourceNode.start(0);
             }
-            
+
             // 確保播放速度設置正確
             if (this.sourceNode.playbackRate) {
                 this.sourceNode.playbackRate.value = this.currentPlaybackRate || 1.0;
             }
-            
+
             this._debouncedDraw();
         } else {
             alert('Audio is not ready');
@@ -322,10 +297,10 @@ class CircularAudioWave {
             this.playing = false;
             this.pausedAt = this.context.currentTime - this.startTime;
             this.sourceNode.stop();
-            
+
             // 保存當前的播放速度
             const currentRate = this.sourceNode.playbackRate.value;
-            
+
             // 重新創建音頻節點
             this.sourceNode = this.context.createBufferSource();
             this.sourceNode.buffer = this._currentBuffer;
@@ -333,7 +308,7 @@ class CircularAudioWave {
             this.sourceNode.connect(this.gainNode);
             this.sourceNode.onended = this.onended.bind(this);
             this.sourceNode.loop = !!this.opts.loop;
-            
+
             // 恢復播放速度
             this.sourceNode.playbackRate.value = currentRate;
         }
@@ -367,40 +342,40 @@ class CircularAudioWave {
         if (!this.opts.loop) {
             this.playing = false;
             const currentRate = this.sourceNode.playbackRate.value;  // 保存當前速度
-            
+
             this.context.close();
             this.sourceNode.buffer = null;
             this.offlineSource.buffer = null;
             this.reset();
-    
+
             this.context = new AudioContext();
             this.offlineContext = new OfflineAudioContext(2, 30 * 44100, 44100);
             this.sourceNode = this.context.createBufferSource();
             this.offlineSource = this.offlineContext.createBufferSource();
             this.analyser = this.context.createAnalyser();
-            
+
             // 在重新加載音頻之前設置播放速度
             this.currentPlaybackRate = currentRate;
-            
+
             this.loadAudio(this.filePath);
         }
     }
     _setupAudioNodes() {
         this.analyser.smoothingTimeConstant = 0.3;
         this.analyser.fftSize = 2048;
-    
+
         // 添加音量控制節點
         this.gainNode = this.context.createGain();
-        
+
         this.sourceNode.connect(this.analyser);
         this.sourceNode.connect(this.gainNode);
         this.gainNode.connect(this.context.destination);
-        
+
         // 設置初始播放速度
         if (this.currentPlaybackRate) {
             this.sourceNode.playbackRate.value = this.currentPlaybackRate;
         }
-        
+
         this.sourceNode.onended = this.onended.bind(this);
     }
 
@@ -541,8 +516,8 @@ class CircularAudioWave {
                 group.bpm = Math.round(group.bpm);
 
                 if (!(groups.some(interval => {
-                        return (interval.bpm === group.bpm ? interval.count++ : 0);
-                    }))) {
+                    return (interval.bpm === group.bpm ? interval.count++ : 0);
+                }))) {
                     groups.push(group);
                 }
             }
