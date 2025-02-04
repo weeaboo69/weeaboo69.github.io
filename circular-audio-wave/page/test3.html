@@ -427,11 +427,15 @@
                 hiddenContainer3.style.display = 'none';
                 document.body.appendChild(hiddenContainer3);
                 hornWave = new CircularAudioWave(hiddenContainer3, {
-                    loop: false, // 喇叭音效不需要循環
-                    context: wave.context
+                    loop: false,
+                    context: wave ? wave.context : new AudioContext()
                 });
                 window.hornWave = hornWave;
-                hornWave.loadAudio('audio/horn_sound.mp3'); // 請確保有這個音效檔案
+                hornWave.loadAudio('audio/horn_sound.mp3').then(() => {
+                    console.log('喇叭音效載入成功');  // 用於除錯
+                }).catch(err => {
+                    console.error('喇叭音效載入失敗:', err);  // 用於除錯
+                });
             }
         }
 
@@ -794,6 +798,26 @@
                                     if (audioSelect) {
                                         audioSelect.selectedIndex = index;
                                         audioSelect.dispatchEvent(new Event('change'));
+                                    }
+                                }
+                            } else if (type === 'horn') {
+                                const command = line.trim();
+                                if (command === 'PLAY_HORN') {
+                                    console.log('收到喇叭指令');  // 用於除錯
+                                    if (window.hornWave) {
+                                        try {
+                                            // 如果正在播放，先重置
+                                            if (window.hornWave.playing) {
+                                                window.hornWave.destroy();
+                                                window.hornWave.loadAudio('audio/horn_sound.mp3');
+                                            }
+                                            window.hornWave.play();
+                                            console.log('喇叭音效播放成功');  // 用於除錯
+                                        } catch (err) {
+                                            console.error('喇叭音效播放失敗:', err);
+                                        }
+                                    } else {
+                                        console.error('hornWave 未初始化');  // 用於除錯
                                     }
                                 }
                             }
