@@ -813,6 +813,7 @@
                                             const currentContext = window.wave.context;
                                             const sourceNode = currentContext.createBufferSource();
                                             sourceNode.buffer = window.hornWave._currentBuffer;
+                                            sourceNode.connect(window.wave.analyser);
                                             sourceNode.connect(currentContext.destination);
                                             sourceNode.start(0);
                                         } catch (err) {
