@@ -767,30 +767,38 @@
                             if (type === 'wheel') {
                                 const command = line.trim();
                                 if (command === 'WHEEL_TRIGGER') {
-                                    if (window.wheelWave) {
-                                        try {
-                                            const currentContext = window.wave.context;
+                                    if (window.wheelWave && window.wave) {
+                                        (async () => {  // 使用 async IIFE
+                                            try {
+                                                const currentContext = window.wave.context;
 
-                                            // 檢查並確保上下文是開啟的
-                                            if (currentContext.state === 'suspended') {
-                                                await currentContext.resume();
+                                                // 確保 context 是開啟的
+                                                if (currentContext.state === 'suspended') {
+                                                    await currentContext.resume();
+                                                }
+
+                                                // 使用 wheelWave 的 buffer 來建立新的音源
+                                                if (window.wheelWave._currentBuffer) {
+                                                    const sourceNode = currentContext.createBufferSource();
+                                                    sourceNode.buffer = window.wheelWave._currentBuffer;
+
+                                                    // 連接到分析器和輸出
+                                                    sourceNode.connect(window.wave.analyser);
+                                                    sourceNode.connect(currentContext.destination);
+
+                                                    console.log('開始播放輪子音效');
+                                                    console.log('Context 狀態:', currentContext.state);
+                                                    sourceNode.start(0);
+                                                } else {
+                                                    console.error('音效緩衝區未載入');
+                                                }
+                                            } catch (err) {
+                                                console.error('輪子音效播放失敗:', err);
+                                                console.error('錯誤詳情:', err.message);
                                             }
-
-                                            if (currentContext.state === 'running') {
-                                                const sourceNode = currentContext.createBufferSource();
-                                                sourceNode.buffer = window.wheelWave._currentBuffer;
-
-                                                // 連接到分析器和輸出
-                                                sourceNode.connect(window.wave.analyser);
-                                                sourceNode.connect(currentContext.destination);
-
-                                                sourceNode.start(0);
-                                            } else {
-                                                console.error('音訊上下文未開啟');
-                                            }
-                                        } catch (err) {
-                                            console.error('輪子音效播放失敗:', err);
-                                        }
+                                        })();  // 立即執行 async 函數
+                                    } else {
+                                        console.error('wheelWave 或 wave 未初始化');
                                     }
                                 }
                             }
