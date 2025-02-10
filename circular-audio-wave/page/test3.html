@@ -767,38 +767,39 @@
                             if (type === 'wheel') {
                                 const command = line.trim();
                                 if (command === 'WHEEL_TRIGGER') {
-                                    if (window.wheelWave && window.wave) {
-                                        (async () => {  // 使用 async IIFE
+                                    if (window.wave && window.wheelWave) {
+                                        (async () => {
                                             try {
-                                                const currentContext = window.wave.context;
+                                                // 如果 context 已關閉，需要重新創建
+                                                if (window.wave.context.state === 'closed') {
+                                                    // 重新初始化 AudioContext
+                                                    const newContext = new AudioContext();
+                                                    window.wave.context = newContext;
+                                                    window.wave.analyser = newContext.createAnalyser();
+                                                    window.wave.gainNode = newContext.createGain();
 
-                                                // 確保 context 是開啟的
-                                                if (currentContext.state === 'suspended') {
-                                                    await currentContext.resume();
+                                                    // 重新連接節點
+                                                    window.wave.gainNode.connect(window.wave.analyser);
+                                                    window.wave.gainNode.connect(newContext.destination);
                                                 }
 
-                                                // 使用 wheelWave 的 buffer 來建立新的音源
-                                                if (window.wheelWave._currentBuffer) {
-                                                    const sourceNode = currentContext.createBufferSource();
-                                                    sourceNode.buffer = window.wheelWave._currentBuffer;
-
-                                                    // 連接到分析器和輸出
-                                                    sourceNode.connect(window.wave.analyser);
-                                                    sourceNode.connect(currentContext.destination);
-
-                                                    console.log('開始播放輪子音效');
-                                                    console.log('Context 狀態:', currentContext.state);
-                                                    sourceNode.start(0);
-                                                } else {
-                                                    console.error('音效緩衝區未載入');
+                                                if (window.wave.context.state === 'suspended') {
+                                                    await window.wave.context.resume();
                                                 }
+
+                                                // 建立新的音源節點
+                                                const sourceNode = window.wave.context.createBufferSource();
+                                                sourceNode.buffer = window.wheelWave._currentBuffer;
+                                                sourceNode.connect(window.wave.analyser);
+                                                sourceNode.connect(window.wave.context.destination);
+
+                                                console.log('Context 狀態:', window.wave.context.state);
+                                                sourceNode.start(0);
                                             } catch (err) {
                                                 console.error('輪子音效播放失敗:', err);
                                                 console.error('錯誤詳情:', err.message);
                                             }
-                                        })();  // 立即執行 async 函數
-                                    } else {
-                                        console.error('wheelWave 或 wave 未初始化');
+                                        })();
                                     }
                                 }
                             }
