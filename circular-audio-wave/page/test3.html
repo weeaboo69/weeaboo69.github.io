@@ -770,118 +770,128 @@
                                     if (window.wheelWave) {
                                         try {
                                             const currentContext = window.wave.context;
-                                            const sourceNode = currentContext.createBufferSource();
-                                            sourceNode.buffer = window.wheelWave._currentBuffer;
 
-                                            // 連接到分析器和輸出
-                                            sourceNode.connect(window.wave.analyser);
-                                            sourceNode.connect(currentContext.destination);
+                                            // 檢查並確保上下文是開啟的
+                                            if (currentContext.state === 'suspended') {
+                                                await currentContext.resume();
+                                            }
 
-                                            sourceNode.start(0);
+                                            if (currentContext.state === 'running') {
+                                                const sourceNode = currentContext.createBufferSource();
+                                                sourceNode.buffer = window.wheelWave._currentBuffer;
+
+                                                // 連接到分析器和輸出
+                                                sourceNode.connect(window.wave.analyser);
+                                                sourceNode.connect(currentContext.destination);
+
+                                                sourceNode.start(0);
+                                            } else {
+                                                console.error('音訊上下文未開啟');
+                                            }
                                         } catch (err) {
                                             console.error('輪子音效播放失敗:', err);
                                         }
                                     }
                                 }
                             }
-                        else if (type === 'wheel2') {
-                            const speedValue = parseFloat(line.trim());
-                            if (!isNaN(speedValue)) {
-                                if (window.wheelWave2 && window.wheelWave2.sourceNode) {
-                                    window.wheelWave2.sourceNode.playbackRate.value = speedValue;
-                                    if (!window.wheelWave2.playing) {
+                            else if (type === 'wheel2') {
+                                const speedValue = parseFloat(line.trim());
+                                if (!isNaN(speedValue)) {
+                                    if (window.wheelWave2 && window.wheelWave2.sourceNode) {
+                                        window.wheelWave2.sourceNode.playbackRate.value = speedValue;
+                                        if (!window.wheelWave2.playing) {
+                                            try {
+                                                window.wheelWave2.play();
+                                            } catch (err) {
+                                                console.error('輪子音效2播放失敗:', err);
+                                            }
+                                        }
+                                    }
+                                }
+                            } else if (type === 'playlist') {
+                                const command = line.trim();
+                                if (command === 'SELECT_MUSIC_1' ||
+                                    command === 'SELECT_MUSIC_2' ||
+                                    command === 'SELECT_MUSIC_3') {
+                                    const index = parseInt(command.slice(-1));
+                                    const audioSelect = document.getElementById('audioSelect');
+                                    if (audioSelect) {
+                                        audioSelect.selectedIndex = index;
+                                        audioSelect.dispatchEvent(new Event('change'));
+                                    }
+                                }
+                            } else if (type === 'horn') {
+                                const command = line.trim();
+                                if (command === 'PLAY_HORN') {
+                                    if (window.hornWave) {
                                         try {
-                                            window.wheelWave2.play();
+                                            const currentContext = window.wave.context;
+                                            const sourceNode = currentContext.createBufferSource();
+                                            sourceNode.buffer = window.hornWave._currentBuffer;
+                                            sourceNode.connect(window.wave.analyser);
+                                            sourceNode.connect(currentContext.destination);
+                                            sourceNode.start(0);
                                         } catch (err) {
-                                            console.error('輪子音效2播放失敗:', err);
+                                            console.error('喇叭音效播放失敗:', err);
                                         }
                                     }
                                 }
                             }
-                        } else if (type === 'playlist') {
-                            const command = line.trim();
-                            if (command === 'SELECT_MUSIC_1' ||
-                                command === 'SELECT_MUSIC_2' ||
-                                command === 'SELECT_MUSIC_3') {
-                                const index = parseInt(command.slice(-1));
-                                const audioSelect = document.getElementById('audioSelect');
-                                if (audioSelect) {
-                                    audioSelect.selectedIndex = index;
-                                    audioSelect.dispatchEvent(new Event('change'));
-                                }
-                            }
-                        } else if (type === 'horn') {
-                            const command = line.trim();
-                            if (command === 'PLAY_HORN') {
-                                if (window.hornWave) {
-                                    try {
-                                        const currentContext = window.wave.context;
-                                        const sourceNode = currentContext.createBufferSource();
-                                        sourceNode.buffer = window.hornWave._currentBuffer;
-                                        sourceNode.connect(window.wave.analyser);
-                                        sourceNode.connect(currentContext.destination);
-                                        sourceNode.start(0);
-                                    } catch (err) {
-                                        console.error('喇叭音效播放失敗:', err);
-                                    }
-                                }
-                            }
                         }
-                    }
                     } catch (error) {
-                    console.error('Read error:', error);
-                    break;
+                        console.error('Read error:', error);
+                        break;
+                    }
                 }
-            }
-        };
+            };
 
-        const handleDeviceSelect = async (e) => {
-            const selectedValue = e.target.value;
-            if (selectedValue) {
-                await connectDevice(selectedValue);
-            }
-        };
+            const handleDeviceSelect = async (e) => {
+                const selectedValue = e.target.value;
+                if (selectedValue) {
+                    await connectDevice(selectedValue);
+                }
+            };
 
-        if (!supported) {
+            if (!supported) {
+                return (
+                    <div className="p-4 bg-red-500 text-white rounded">
+                        您的瀏覽器不支援藍牙連接功能，請使用支援的瀏覽器（如 Chrome）。
+                    </div>
+                );
+            }
+
             return (
-                <div className="p-4 bg-red-500 text-white rounded">
-                    您的瀏覽器不支援藍牙連接功能，請使用支援的瀏覽器（如 Chrome）。
+                <div className="p-4">
+                    <div className="flex flex-col gap-4 mb-4">
+                        <select
+                            onChange={handleDeviceSelect}
+                            className="select bg-gray-700 text-white p-2 rounded cursor-pointer hover:bg-gray-600"
+                        >
+                            {deviceOptions.map(option => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+
+                        {Object.entries(devices).map(([type, device]) =>
+                            device && (
+                                <div key={type} className="bg-gray-700 p-3 rounded mb-2">
+                                    <div className="text-white">
+                                        {getDeviceLabel(type)}已連接
+                                    </div>
+                                    <button
+                                        onClick={() => disconnectDevice(type)}
+                                        className="text-red-400 hover:text-red-300"
+                                    >
+                                        中斷連接
+                                    </button>
+                                </div>
+                            )
+                        )}
+                    </div>
                 </div>
             );
-        }
-
-        return (
-            <div className="p-4">
-                <div className="flex flex-col gap-4 mb-4">
-                    <select
-                        onChange={handleDeviceSelect}
-                        className="select bg-gray-700 text-white p-2 rounded cursor-pointer hover:bg-gray-600"
-                    >
-                        {deviceOptions.map(option => (
-                            <option key={option.value} value={option.value}>
-                                {option.label}
-                            </option>
-                        ))}
-                    </select>
-
-                    {Object.entries(devices).map(([type, device]) =>
-                        device && (
-                            <div key={type} className="bg-gray-700 p-3 rounded mb-2">
-                                <div className="text-white">
-                                    {getDeviceLabel(type)}已連接
-                                </div>
-                                <button
-                                    onClick={() => disconnectDevice(type)}
-                                    className="text-red-400 hover:text-red-300"
-                                >
-                                    中斷連接
-                                </button>
-                            </div>
-                        )
-                    )}
-                </div>
-            </div>
-        );
         }
 
         window.onload = function () {
