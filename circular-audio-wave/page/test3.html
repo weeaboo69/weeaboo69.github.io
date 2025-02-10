@@ -404,7 +404,7 @@
                 hiddenContainer.style.display = 'none';
                 document.body.appendChild(hiddenContainer);
                 wheelWave = new CircularAudioWave(hiddenContainer, {
-                    loop: true,
+                    loop: false,
                     context: mainContext  // 使用主要 wave 的 context
                 });
                 window.wheelWave = wheelWave;
