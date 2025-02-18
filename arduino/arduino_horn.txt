@@ -1,0 +1,25 @@
+#include "BluetoothSerial.h"
+
+BluetoothSerial SerialBT;
+const int BUTTON_PIN = 13;
+bool lastButtonState = false;
+
+void setup() {
+ Serial.begin(9600);
+ SerialBT.begin("ESP32_Horn");
+ pinMode(BUTTON_PIN, INPUT_PULLUP);
+ Serial.println("Button Music Control Started");
+}
+
+void loop() {
+ bool buttonPressed = !digitalRead(BUTTON_PIN);
+ 
+ // 只有當按鈕從放開變成按下時才發送指令
+ if (buttonPressed && !lastButtonState) {
+   SerialBT.println("PLAY_HORN");
+   Serial.println("PLAY_HORN");
+ }
+ 
+ lastButtonState = buttonPressed;  // 更新前一個狀態
+ delay(100);
+}
