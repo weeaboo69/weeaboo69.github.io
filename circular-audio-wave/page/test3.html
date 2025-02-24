@@ -563,9 +563,9 @@
 
                     try {
                         // 請求授權
-                        tokenClient.callback = async (response) => {
-                            if (response.error !== undefined) {
-                                throw response;
+                        tokenClient.callback = async (resp) => {  // 改用不同的變數名稱
+                            if (resp.error !== undefined) {
+                                throw resp;
                             }
 
                             // 準備上傳
@@ -581,13 +581,13 @@
 
                             // 上傳到 Drive
                             const accessToken = gapi.client.getToken().access_token;
-                            const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                            const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
                                 method: 'POST',
                                 headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
                                 body: form
                             });
 
-                            const data = await response.json();
+                            const data = await uploadResponse.json();
                             const fileId = data.id;
                             const shareLink = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
 
