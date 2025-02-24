@@ -558,54 +558,71 @@
                     const blob = new Blob(recordedChunks, { type: 'audio/webm' });
 
                     try {
-                        // 請求授權
-                        tokenClient.callback = async (resp) => {  // 改用不同的變數名稱
-                            if (resp.error !== undefined) {
-                                throw resp;
-                            }
+                        // 使用 Promise 包裝 token 請求
+                        const getToken = () => {
+                            return new Promise((resolve, reject) => {
+                                try {
+                                    tokenClient.callback = (resp) => {
+                                        if (resp.error !== undefined) {
+                                            reject(resp);
+                                        }
+                                        resolve(resp.access_token);
+                                    };
 
-                            // 準備上傳
-                            const file = new File([blob], 'recorded_audio.webm');
-                            const metadata = {
-                                name: 'recorded_audio.webm',
-                                mimeType: 'audio/webm'
-                            };
-
-                            const form = new FormData();
-                            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-                            form.append('file', file);
-
-                            // 上傳到 Drive
-                            const accessToken = gapi.client.getToken().access_token;
-                            const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-                                method: 'POST',
-                                headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
-                                body: form
+                                    if (gapi.client.getToken() === null) {
+                                        tokenClient.requestAccessToken({ prompt: 'consent' });
+                                    } else {
+                                        tokenClient.requestAccessToken({ prompt: '' });
+                                    }
+                                } catch (err) {
+                                    reject(err);
+                                }
                             });
-
-                            const data = await uploadResponse.json();
-                            const fileId = data.id;
-                            const shareLink = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
-
-                            // 生成 QR code
-                            qrContainer.innerHTML = '';
-                            const qr = qrcode(0, 'M');
-                            qr.addData(shareLink);
-                            qr.make();
-                            qrContainer.innerHTML = qr.createImgTag(5);
-
-                            // 添加下載連結
-                            const linkInfo = document.createElement('p');
-                            linkInfo.innerHTML = `<a href="${shareLink}" target="_blank" style="color: white; text-decoration: underline;">點擊此處下載錄音</a>`;
-                            qrContainer.appendChild(linkInfo);
-                            qrInfo.style.display = 'block';
                         };
 
-                        if (gapi.client.getToken() === null) {
-                            tokenClient.requestAccessToken({ prompt: 'consent' });
-                        } else {
-                            tokenClient.requestAccessToken({ prompt: '' });
+                        // 獲取 token
+                        await getToken();
+
+                        // 準備上傳
+                        const file = new File([blob], 'recorded_audio.webm');
+                        const metadata = {
+                            name: 'recorded_audio.webm',
+                            mimeType: 'audio/webm'
+                        };
+
+                        const form = new FormData();
+                        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                        form.append('file', file);
+
+                        // 上傳到 Drive
+                        const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                            method: 'POST',
+                            headers: new Headers({
+                                'Authorization': 'Bearer ' + gapi.client.getToken().access_token
+                            }),
+                            body: form
+                        });
+
+                        if (!uploadResponse.ok) {
+                            throw new Error('Upload failed: ' + uploadResponse.statusText);
                         }
+
+                        const data = await uploadResponse.json();
+                        const fileId = data.id;
+                        const shareLink = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
+
+                        // 生成 QR code
+                        qrContainer.innerHTML = '';
+                        const qr = qrcode(0, 'M');
+                        qr.addData(shareLink);
+                        qr.make();
+                        qrContainer.innerHTML = qr.createImgTag(5);
+
+                        // 添加下載連結
+                        const linkInfo = document.createElement('p');
+                        linkInfo.innerHTML = `<a href="${shareLink}" target="_blank" style="color: white; text-decoration: underline;">點擊此處下載錄音</a>`;
+                        qrContainer.appendChild(linkInfo);
+                        qrInfo.style.display = 'block';
 
                     } catch (error) {
                         console.error('Upload failed:', error);
