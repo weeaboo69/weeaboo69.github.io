@@ -1042,6 +1042,33 @@
                         }
                     }
                 } else if (type === 'horn') {
+                    const data = line.trim();
+                    if (data.startsWith("HORN_POSITION:")) {
+                        const positionValue = parseInt(data.split(":")[1]);
+                        if (!isNaN(positionValue) && window.hornWave && window.hornWave._currentBuffer) {
+                            // 計算音檔的實際位置（秒數）
+                            const bufferDuration = window.hornWave._currentBuffer.duration;
+                            const newPosition = (positionValue / 100) * bufferDuration;
+
+                            // 如果 hornWave 正在播放，先停止它
+                            if (window.hornWave.playing) {
+                                window.hornWave.pause();
+                            }
+
+                            // 創建新的音源並設置位置
+                            const currentContext = window.wave.context;
+                            const sourceNode = currentContext.createBufferSource();
+                            sourceNode.buffer = window.hornWave._currentBuffer;
+                            sourceNode.connect(window.wave.analyser);
+                            sourceNode.connect(currentContext.destination);
+
+                            // 從新位置開始播放
+                            sourceNode.start(0, newPosition);
+
+                            // 更新 UI 顯示當前位置（如果需要）
+                            console.log(`音效位置: ${positionValue}%, ${newPosition.toFixed(2)}秒`);
+                        }
+                    }
                     if (data.trim() === 'PLAY_HORN') {
                         if (window.hornWave) {
                             try {
