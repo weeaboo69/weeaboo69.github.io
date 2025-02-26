@@ -851,217 +851,312 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        const connectDevice = async (type) => {
-            try {
-                const deviceOption = deviceOptions.find(d => d.value === type);
-                if (!deviceOption) return;
+        function MultiController() {
+            const [devices, setDevices] = React.useState({
+                wheel: null,
+                wheel2: null,
+                playlist: null,
+                horn: null
+            });
+            const [supported, setSupported] = React.useState(true);
+            const [notifications, setNotifications] = React.useState({});
 
-                setNotification(type, `正在連接 ${getDeviceLabel(type)}...`);
+            React.useEffect(() => {
+                if (!navigator.bluetooth) {
+                    setSupported(false);
+                }
+            }, []);
 
-                // 請求藍牙裝置
-                const device = await navigator.bluetooth.requestDevice({
-                    filters: [
-                        { namePrefix: "ESP32_" }
-                    ],
-                    optionalServices: ["battery_service"] // 標準電池服務
-                });
+            const deviceOptions = [
+                { value: "", label: "選擇要連接的裝置" },
+                { value: "wheel", label: "粽子", serviceUUID: "battery_service" },
+                { value: "wheel2", label: "轉速控制器 2", serviceUUID: "battery_service" },
+                { value: "playlist", label: "歌單控制器", serviceUUID: "battery_service" },
+                { value: "horn", label: "喇叭控制器", serviceUUID: "battery_service" }
+            ];
 
-                setNotification(type, `已找到裝置，正在連接...`);
+            const getDeviceLabel = (type) => {
+                const device = deviceOptions.find(opt => opt.value === type);
+                return device ? device.label : type;
+            };
 
-                // 連接到 GATT 伺服器
-                const server = await device.gatt.connect();
+            // 處理喇叭位置值
+            const handleHornPositionValue = (positionValue) => {
+                if (window.wave && window.hornWave && window.hornWave._currentBuffer) {
+                    try {
+                        // 確保音訊上下文是活躍的
+                        if (window.wave.context.state === 'suspended') {
+                            window.wave.context.resume();
+                        }
 
-                // 獲取服務
-                const service = await server.getPrimaryService("battery_service");
+                        // 計算音檔的實際位置（秒數）
+                        const bufferDuration = window.hornWave._currentBuffer.duration;
+                        const newPosition = (positionValue / 100) * bufferDuration;
 
-                // 獲取特性
-                const characteristic = await service.getCharacteristic("battery_level");
+                        // 建立新的音源節點
+                        const sourceNode = window.wave.context.createBufferSource();
+                        sourceNode.buffer = window.hornWave._currentBuffer;
+                        sourceNode.connect(window.wave.analyser);
+                        sourceNode.connect(window.wave.context.destination);
+                        sourceNode.start(0, newPosition);
 
-                // 啟用通知
-                await characteristic.startNotifications();
-
-                // 監聽通知，根據設備類型處理不同邏輯
-                characteristic.addEventListener('characteristicvaluechanged', (event) => {
-                    const value = event.target.value;
-                    const dataValue = value.getUint8(0);
-
-                    // 根據設備類型處理不同邏輯
-                    if (type === 'horn') {
-                        handleHornPositionValue(dataValue);
-                    } else if (type === 'wheel') {
-                        handleWheelTrigger(dataValue);
-                    } else if (type === 'wheel2') {
-                        handleWheel2SpeedValue(dataValue);
-                    } else if (type === 'playlist') {
-                        handlePlaylistSelection(dataValue);
+                        console.log(`喇叭音效位置: ${positionValue}%, ${newPosition.toFixed(2)}秒`);
+                    } catch (err) {
+                        console.error('設置喇叭音效位置失敗:', err);
                     }
-                });
+                }
+            };
 
-                setDevices(prev => ({
+            // 處理輪子觸發
+            const handleWheelTrigger = (value) => {
+                // 假設值為 100 表示觸發輪子
+                if (value === 100 && window.wave && window.wheelWave) {
+                    try {
+                        // 確保音訊上下文是活躍的
+                        if (window.wave.context.state === 'suspended') {
+                            window.wave.context.resume();
+                        }
+
+                        // 建立新的音源節點
+                        const sourceNode = window.wave.context.createBufferSource();
+                        sourceNode.buffer = window.wheelWave._currentBuffer;
+                        sourceNode.connect(window.wave.analyser);
+                        sourceNode.connect(window.wave.context.destination);
+                        sourceNode.start(0);
+
+                        console.log('輪子音效已觸發');
+                    } catch (err) {
+                        console.error('輪子音效播放失敗:', err);
+                    }
+                }
+            };
+
+            // 處理輪子2速度值
+            const handleWheel2SpeedValue = (speedValue) => {
+                // 將 0-100 的值映射到播放速度範圍 (例如 0.5-2.0)
+                const playbackRate = 0.5 + (speedValue / 100) * 1.5;
+
+                if (window.wheelWave2 && window.wheelWave2.sourceNode) {
+                    window.wheelWave2.sourceNode.playbackRate.value = playbackRate;
+                    if (!window.wheelWave2.playing) {
+                        try {
+                            window.wheelWave2.play();
+                        } catch (err) {
+                            console.error('輪子音效2播放失敗:', err);
+                        }
+                    }
+                    console.log(`輪子2速度已設為: ${playbackRate.toFixed(2)}x`);
+                }
+            };
+
+            // 處理歌單選擇
+            const handlePlaylistSelection = (value) => {
+                // 將 0-100 的值映射到 1-3 的歌曲選擇
+                const songIndex = Math.ceil((value / 100) * 3);
+                if (songIndex >= 1 && songIndex <= 3) {
+                    const audioSelect = document.getElementById('audioSelect');
+                    if (audioSelect) {
+                        audioSelect.selectedIndex = songIndex;
+                        audioSelect.dispatchEvent(new Event('change'));
+                        console.log(`已選擇歌曲 ${songIndex}`);
+                    }
+                }
+            };
+
+            // 連接裝置
+            const connectDevice = async (type) => {
+                try {
+                    const deviceOption = deviceOptions.find(d => d.value === type);
+                    if (!deviceOption) return;
+
+                    setNotification(type, `正在連接 ${getDeviceLabel(type)}...`);
+
+                    // 請求藍牙裝置
+                    const device = await navigator.bluetooth.requestDevice({
+                        filters: [
+                            { namePrefix: "ESP32_" }
+                        ],
+                        optionalServices: ["battery_service"] // 標準電池服務
+                    });
+
+                    setNotification(type, `已找到裝置，正在連接...`);
+
+                    // 連接到 GATT 伺服器
+                    const server = await device.gatt.connect();
+
+                    // 獲取服務
+                    const service = await server.getPrimaryService("battery_service");
+
+                    // 獲取特性
+                    const characteristic = await service.getCharacteristic("battery_level");
+
+                    // 啟用通知
+                    await characteristic.startNotifications();
+
+                    // 監聽通知，根據設備類型處理不同邏輯
+                    characteristic.addEventListener('characteristicvaluechanged', (event) => {
+                        const value = event.target.value;
+                        const dataValue = value.getUint8(0);
+
+                        // 根據設備類型處理不同邏輯
+                        if (type === 'horn') {
+                            handleHornPositionValue(dataValue);
+                        } else if (type === 'wheel') {
+                            handleWheelTrigger(dataValue);
+                        } else if (type === 'wheel2') {
+                            handleWheel2SpeedValue(dataValue);
+                        } else if (type === 'playlist') {
+                            handlePlaylistSelection(dataValue);
+                        }
+                    });
+
+                    setDevices(prev => ({
+                        ...prev,
+                        [type]: {
+                            device,
+                            server,
+                            characteristic,
+                            value: 0
+                        }
+                    }));
+
+                    // 播放相應音效，根據設備類型
+                    if (type === 'wheel' && window.wheelWave) {
+                        try {
+                            window.wheelWave.play();
+                        } catch (err) {
+                            console.error('輪子音效1播放失敗:', err);
+                            setNotification(type, '輪子音效1播放失敗: ' + err.message);
+                        }
+                    } else if (type === 'wheel2' && window.wheelWave2) {
+                        try {
+                            window.wheelWave2.play();
+                        } catch (err) {
+                            console.error('輪子音效2播放失敗:', err);
+                            setNotification(type, '輪子音效2播放失敗: ' + err.message);
+                        }
+                    }
+
+                    setNotification(type, `${getDeviceLabel(type)}已連接成功`);
+                } catch (err) {
+                    console.error('藍牙連接失敗:', err);
+                    setNotification(type, '藍牙連接失敗: ' + err.message);
+                }
+            };
+
+            // 設置通知
+            const setNotification = (type, message) => {
+                setNotifications(prev => ({
                     ...prev,
-                    [type]: {
-                        device,
-                        server,
-                        characteristic,
-                        value: 0
-                    }
+                    [type]: message
                 }));
 
-                // 播放相應音效，根據設備類型
-                if (type === 'wheel' && window.wheelWave) {
+                // 3秒後清除通知
+                setTimeout(() => {
+                    setNotifications(prev => ({
+                        ...prev,
+                        [type]: null
+                    }));
+                }, 3000);
+            };
+
+            // 中斷連接
+            const disconnectDevice = async (type) => {
+                const device = devices[type];
+                if (device) {
                     try {
-                        window.wheelWave.play();
+                        // 停止通知
+                        if (device.characteristic) {
+                            await device.characteristic.stopNotifications();
+                        }
+
+                        // 關閉 GATT 連接
+                        if (device.server && device.server.connected) {
+                            device.server.disconnect();
+                        }
+
+                        // 停止相應音效
+                        if (type === 'horn' && window.hornWave) {
+                            window.hornWave.pause();
+                        } else if (type === 'wheel' && window.wheelWave) {
+                            window.wheelWave.pause();
+                        } else if (type === 'wheel2' && window.wheelWave2) {
+                            window.wheelWave2.pause();
+                        }
+
+                        setDevices(prev => ({
+                            ...prev,
+                            [type]: null
+                        }));
+
+                        setNotification(type, `${getDeviceLabel(type)}已中斷連接`);
                     } catch (err) {
-                        console.error('輪子音效1播放失敗:', err);
-                        setNotification(type, '輪子音效1播放失敗: ' + err.message);
-                    }
-                } else if (type === 'wheel2' && window.wheelWave2) {
-                    try {
-                        window.wheelWave2.play();
-                    } catch (err) {
-                        console.error('輪子音效2播放失敗:', err);
-                        setNotification(type, '輪子音效2播放失敗: ' + err.message);
+                        console.error('中斷連接失敗:', err);
+                        setNotification(type, '中斷連接失敗: ' + err.message);
                     }
                 }
+            };
 
-                setNotification(type, `${getDeviceLabel(type)}已連接成功`);
-            } catch (err) {
-                console.error('藍牙連接失敗:', err);
-                setNotification(type, '藍牙連接失敗: ' + err.message);
-            }
-        };
-
-        // 定義各種裝置的處理函數
-        const handleHornPositionValue = (positionValue) => {
-            if (window.wave && window.hornWave && window.hornWave._currentBuffer) {
-                try {
-                    // 確保音訊上下文是活躍的
-                    if (window.wave.context.state === 'suspended') {
-                        window.wave.context.resume();
-                    }
-
-                    // 計算音檔的實際位置（秒數）
-                    const bufferDuration = window.hornWave._currentBuffer.duration;
-                    const newPosition = (positionValue / 100) * bufferDuration;
-
-                    // 建立新的音源節點
-                    const sourceNode = window.wave.context.createBufferSource();
-                    sourceNode.buffer = window.hornWave._currentBuffer;
-                    sourceNode.connect(window.wave.analyser);
-                    sourceNode.connect(window.wave.context.destination);
-                    sourceNode.start(0, newPosition);
-
-                    console.log(`喇叭音效位置: ${positionValue}%, ${newPosition.toFixed(2)}秒`);
-                } catch (err) {
-                    console.error('設置喇叭音效位置失敗:', err);
+            // 處理設備選擇
+            const handleDeviceSelect = async (e) => {
+                const selectedValue = e.target.value;
+                if (selectedValue) {
+                    await connectDevice(selectedValue);
                 }
-            }
-        };
+            };
 
-        const handleWheelTrigger = (value) => {
-            // 假設值為 100 表示觸發輪子
-            if (value === 100 && window.wave && window.wheelWave) {
-                try {
-                    // 確保音訊上下文是活躍的
-                    if (window.wave.context.state === 'suspended') {
-                        window.wave.context.resume();
-                    }
-
-                    // 建立新的音源節點
-                    const sourceNode = window.wave.context.createBufferSource();
-                    sourceNode.buffer = window.wheelWave._currentBuffer;
-                    sourceNode.connect(window.wave.analyser);
-                    sourceNode.connect(window.wave.context.destination);
-                    sourceNode.start(0);
-
-                    console.log('輪子音效已觸發');
-                } catch (err) {
-                    console.error('輪子音效播放失敗:', err);
-                }
-            }
-        };
-
-        const handleWheel2SpeedValue = (speedValue) => {
-            // 將 0-100 的值映射到播放速度範圍 (例如 0.5-2.0)
-            const playbackRate = 0.5 + (speedValue / 100) * 1.5;
-
-            if (window.wheelWave2 && window.wheelWave2.sourceNode) {
-                window.wheelWave2.sourceNode.playbackRate.value = playbackRate;
-                if (!window.wheelWave2.playing) {
-                    try {
-                        window.wheelWave2.play();
-                    } catch (err) {
-                        console.error('輪子音效2播放失敗:', err);
-                    }
-                }
-                console.log(`輪子2速度已設為: ${playbackRate.toFixed(2)}x`);
-            }
-        };
-
-        const handlePlaylistSelection = (value) => {
-            // 將 0-100 的值映射到 1-3 的歌曲選擇
-            const songIndex = Math.ceil((value / 100) * 3);
-            if (songIndex >= 1 && songIndex <= 3) {
-                const audioSelect = document.getElementById('audioSelect');
-                if (audioSelect) {
-                    audioSelect.selectedIndex = songIndex;
-                    audioSelect.dispatchEvent(new Event('change'));
-                    console.log(`已選擇歌曲 ${songIndex}`);
-                }
-            }
-        };
-
-        if (!supported) {
+            // 渲染組件
             return (
-                <div className="p-4 bg-red-500 text-white rounded">
-                    您的瀏覽器不支援藍牙連接功能，請使用支援 Web Bluetooth API 的瀏覽器。
+                <div className="p-4">
+                    {!supported ? (
+                        <div className="p-4 bg-red-500 text-white rounded">
+                            您的瀏覽器不支援藍牙連接功能，請使用支援 Web Bluetooth API 的瀏覽器。
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-4 mb-4">
+                            <select
+                                onChange={handleDeviceSelect}
+                                className="select bg-gray-700 text-white p-2 rounded cursor-pointer hover:bg-gray-600"
+                            >
+                                {deviceOptions.map(option => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+
+                            {Object.entries(devices).map(([type, device]) =>
+                                device && (
+                                    <div key={type} className="bg-gray-700 p-3 rounded mb-2">
+                                        <div className="text-white">
+                                            {getDeviceLabel(type)}已連接
+                                            {type === 'horn' && device.value && (
+                                                <span className="ml-2">位置: {device.value}%</span>
+                                            )}
+                                        </div>
+                                        <button
+                                            onClick={() => disconnectDevice(type)}
+                                            className="text-red-400 hover:text-red-300"
+                                        >
+                                            中斷連接
+                                        </button>
+                                    </div>
+                                )
+                            )}
+
+                            {Object.entries(notifications).map(([type, message]) =>
+                                message && (
+                                    <div key={`notification-${type}`} className="bg-blue-500 p-2 rounded text-white">
+                                        {message}
+                                    </div>
+                                )
+                            )}
+                        </div>
+                    )}
                 </div>
             );
         }
 
-        return (
-            <div className="p-4">
-                <div className="flex flex-col gap-4 mb-4">
-                    <select
-                        onChange={handleDeviceSelect}
-                        className="select bg-gray-700 text-white p-2 rounded cursor-pointer hover:bg-gray-600"
-                    >
-                        {deviceOptions.map(option => (
-                            <option key={option.value} value={option.value}>
-                                {option.label}
-                            </option>
-                        ))}
-                    </select>
-
-                    {Object.entries(devices).map(([type, device]) =>
-                        device && (
-                            <div key={type} className="bg-gray-700 p-3 rounded mb-2">
-                                <div className="text-white">
-                                    {getDeviceLabel(type)}已連接
-                                    {type === 'horn' && device.value && (
-                                        <span className="ml-2">位置: {device.value}%</span>
-                                    )}
-                                </div>
-                                <button
-                                    onClick={() => disconnectDevice(type)}
-                                    className="text-red-400 hover:text-red-300"
-                                >
-                                    中斷連接
-                                </button>
-                            </div>
-                        )
-                    )}
-
-                    {Object.entries(notifications).map(([type, message]) =>
-                        message && (
-                            <div key={`notification-${type}`} className="bg-blue-500 p-2 rounded text-white">
-                                {message}
-                            </div>
-                        )
-                    )}
-                </div>
-            </div>
-        );
 
         window.onload = function () {
             const container = document.getElementById('serial-controls');
