@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="Origin-Trial" content="enable-web-serial">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Origin-Trial"
+        content="Ar5+HkOG0w/jBMDmvZJOXElwzKHmQ+9+9tJZs1UvBJvNO/u0+kitGB4Hs1lcfuOxKZx1xvqUQlLrVRVmFqc78QUAAABweyJvcmlnaW4iOiJodHRwczovL3lvdXItZG9tYWluLmNvbTo0NDMiLCJmZWF0dXJlIjoiV2ViQmx1ZXRvb3RoIiwiZXhwaXJ5IjoxNjY3OTI2Mzk5LCJpc1N1YmRvbWFpbiI6dHJ1ZX0=">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Audio Visualizer</title>
+
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="../src/js/circular-audio-wave.js"></script>
+    <style>
+        /* 保留原有樣式 */
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: #2d2d2d;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .controls {
+            background: #2d2d2d;
+            padding: 1rem;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .connect-btn {
+            background: #4a5568;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            min-width: 140px;
+            text-align: center;
+        }
+
+        .connect-btn.wheel {
+            background: #4299e1;
+        }
+
+        .connect-btn.wheel:hover {
+            background: #3182ce;
+        }
+
+        .connect-btn.playlist {
+            background: #48bb78;
+        }
+
+        .connect-btn.playlist:hover {
+            background: #38a169;
+        }
+
+        .connect-btn.horn {
+            background: #9333ea;
+            /* 紫色系 */
+        }
+
+        .connect-btn.horn:hover {
+            background: #7e22ce;
+        }
+
+        /* 調整 controls 的樣式確保按鈕對齊 */
+        .controls {
+            background: #2d2d2d;
+            padding: 1rem;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        /* 錄音計時器樣式 */
+        .recording-timer {
+            margin-left: 0.5rem;
+            color: #fff;
+        }
+
+        .btn,
+        .record-btn {
+            background: #4a5568;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            min-width: 100px;
+            text-align: center;
+        }
+
+        .btn:hover,
+        .record-btn:hover {
+            background: #2d3748;
+            transform: translateY(-1px);
+        }
+
+        .btn:active,
+        .record-btn:active {
+            transform: translateY(1px);
+        }
+
+        .btn:disabled {
+            background: #718096;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        #playBtn {
+            background: #48bb78;
+        }
+
+        #playBtn:hover {
+            background: #38a169;
+        }
+
+        #pauseBtn {
+            background: #ed8936;
+        }
+
+        #pauseBtn:hover {
+            background: #dd6b20;
+        }
+
+        #stopBtn {
+            background: #f56565;
+        }
+
+        #stopBtn:hover {
+            background: #e53e3e;
+        }
+
+        /* 錄音按鈕特殊狀態 */
+        .record-btn.recording {
+            background: #f56565;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(245, 101, 101, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 10px rgba(245, 101, 101, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(245, 101, 101, 0);
+            }
+        }
+
+        /* 控制器連接按鈕樣式更新 */
+        .bg-blue-500 {
+            background: #4299e1 !important;
+        }
+
+        .bg-blue-500:hover {
+            background: #3182ce !important;
+        }
+
+        .bg-green-500 {
+            background: #48bb78 !important;
+        }
+
+        .bg-green-500:hover {
+            background: #38a169 !important;
+        }
+
+        /* 下拉選單統一樣式 */
+        .select {
+            background: #2d3748;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid #4a5568;
+            outline: none;
+            min-width: 200px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .select:hover {
+            border-color: #63b3ed;
+        }
+
+        .select:focus {
+            border-color: #63b3ed;
+            box-shadow: 0 0 0 3px rgba(99, 179, 237, 0.3);
+        }
+
+        #chart-container {
+            flex: 1;
+            min-height: 500px;
+            padding: 1rem;
+        }
+
+        .select {
+            padding: 10px;
+            border-radius: 5px;
+            background: #333;
+            color: white;
+            border: 1px solid #444;
+            min-width: 200px;
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .speed-value {
+            min-width: 60px;
+        }
+
+        #serial-controls {
+            background: #2d2d2d;
+            padding: 1rem;
+            margin: 1rem;
+            border-radius: 8px;
+        }
+
+        /* Tailwind-like classes */
+        .bg-blue-500 {
+            background-color: #3b82f6;
+        }
+
+        .hover\:bg-blue-600:hover {
+            background-color: #2563eb;
+        }
+
+        .bg-green-500 {
+            background-color: #22c55e;
+        }
+
+        .hover\:bg-green-600:hover {
+            background-color: #16a34a;
+        }
+
+        .bg-gray-700 {
+            background-color: #374151;
+        }
+
+        .text-white {
+            color: white;
+        }
+
+        .text-green-400 {
+            color: #34d399;
+        }
+
+        .text-gray-300 {
+            color: #d1d5db;
+        }
+
+        .text-red-400 {
+            color: #f87171;
+        }
+
+        .p-4 {
+            padding: 1rem;
+        }
+
+        .p-3 {
+            padding: 0.75rem;
+        }
+
+        .mb-4 {
+            margin-bottom: 1rem;
+        }
+
+        .gap-4 {
+            gap: 1rem;
+        }
+
+        .rounded {
+            border-radius: 0.25rem;
+        }
+
+        .flex {
+            display: flex;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- HTML 結構保持不變 -->
+    <div class="header">
+        <h1>謀聲</h1>
+    </div>
+
+    <div class="recording-controls">
+        <button id="recordBtn" class="record-btn">
+            <span>開始錄音</span>
+        </button>
+        <span id="recordingTimer" class="recording-timer">00:00</span>
+    </div>
+
+    <div id="serial-controls">載入中...</div>
+
+    <div id="debugInfo" class="debug-info"></div>
+    <div id="errorMessage" class="error-message"></div>
+
+    <div class="controls">
+        <select id="audioSelect" class="select">
+            <option value="">選擇預設音樂</option>
+            <option value="audio/1.mp3">歌曲 1</option>
+            <option value="audio/2.mp3">歌曲 2</option>
+            <option value="audio/3.mp3">歌曲 3</option>
+        </select>
+
+
+        <div class="btn-group">
+            <button id="playBtn" class="btn" disabled>播放</button>
+            <button id="pauseBtn" class="btn" disabled>暫停</button>
+            <button id="stopBtn" class="btn" disabled>停止</button>
+        </div>
+
+        <div class="speed-control">
+            <span>速度:</span>
+            <span id="speedValue" class="speed-value">1.0x</span>
+        </div>
+
+        <select id="modeSelect" class="select">
+            <option value="default">默認波形</option>
+            <option value="sunburst">太陽爆發效果</option>
+        </select>
+    </div>
+
+    <div id="chart-container"></div>
+
+    <div id="status" class="status">
+        請選擇音樂...
+    </div>
+
+
+
+    <!-- 基本腳本保持不變 -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+
+    <!-- Main Scripts -->
+    <script>
+        const CLIENT_ID = '934630239540-q0std8hqqsg5barb7ecutt96833h0ekp.apps.googleusercontent.com';
+        const API_KEY = 'AIzaSyAM8Q0sskReUOMObOkCHryHVMcVPRzR8Z4';
+        const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+        let tokenClient;
+        let gapiInited = false;
+        let gisInited = false;
+
+        function gapiLoaded() {
+            gapi.load('client', initializeGapiClient);
+        }
+
+        async function initializeGapiClient() {
+            await gapi.client.init({
+                apiKey: API_KEY,
+                discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
+            });
+            gapiInited = true;
+            maybeEnableButtons();
+        }
+
+        function gisLoaded() {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: '', // 會在需要時定義
+            });
+            gisInited = true;
+            maybeEnableButtons();
+        }
+
+        function maybeEnableButtons() {
+            if (gapiInited && gisInited) {
+                console.log('Google API 初始化完成');
+            }
+        }
+
+        let wave = null;
+        let wheelWave = null; // 輪子音效的 wave
+        let wheelWave2 = null;
+        let hornWave = null;
+        let isPlaying = false;
+        let currentSpeedPercent = 100;
+        window.wave = null;
+
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let isRecording = false;
+        let recordingStartTime = 0;
+        let timerInterval = null;
+
+        const recordBtn = document.getElementById('recordBtn');
+        const recordingTimer = document.getElementById('recordingTimer');
+
+
+        const playBtn = document.getElementById('playBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const audioSelect = document.getElementById('audioSelect');
+        const modeSelect = document.getElementById('modeSelect');
+        const status = document.getElementById('status');
+        const speedValue = document.getElementById('speedValue');
+
+        // 其他基本功能保持不變...
+        function initVisualizer(mode = 'default') {
+            if (!wave) {
+                wave = new CircularAudioWave(document.getElementById('chart-container'), {
+                    mode: mode,
+                    loop: true
+                });
+                window.wave = wave;
+            }
+
+            // 使用主要 wave 的 AudioContext
+            const mainContext = wave.context;
+
+            if (!wheelWave) {
+                const hiddenContainer = document.createElement('div');
+                hiddenContainer.style.display = 'none';
+                document.body.appendChild(hiddenContainer);
+                wheelWave = new CircularAudioWave(hiddenContainer, {
+                    loop: false,
+                    context: mainContext  // 使用主要 wave 的 context
+                });
+                window.wheelWave = wheelWave;
+                wheelWave.loadAudio('audio/RDP.wav');
+            }
+
+            if (!wheelWave2) {
+                const hiddenContainer2 = document.createElement('div');
+                hiddenContainer2.style.display = 'none';
+                document.body.appendChild(hiddenContainer2);
+                wheelWave2 = new CircularAudioWave(hiddenContainer2, {
+                    loop: true,
+                    context: mainContext  // 使用主要 wave 的 context
+                });
+                window.wheelWave2 = wheelWave2;
+                wheelWave2.loadAudio('audio/wheel_sound2.mp3');
+            }
+            if (!hornWave) {
+                const hiddenContainer3 = document.createElement('div');
+                hiddenContainer3.style.display = 'none';
+                document.body.appendChild(hiddenContainer3);
+                hornWave = new CircularAudioWave(hiddenContainer3, {
+                    loop: false,
+                    context: mainContext  // 使用主要 wave 的 context
+                });
+                window.hornWave = hornWave;
+                hornWave.loadAudio('audio/horn_sound.mp3');
+            }
+        }
+
+        async function setupRecording() {
+            const qrContainer = document.createElement('div');
+            qrContainer.id = 'qrContainer';
+            qrContainer.style.margin = '20px 0';
+            document.body.appendChild(qrContainer);
+
+            const qrInfo = document.createElement('p');
+            qrInfo.id = 'qrInfo';
+            qrInfo.style.display = 'none';
+            qrInfo.innerHTML = '掃描 QR code 在手機上下載錄音<br><strong>注意：此連結僅在當前瀏覽會話中有效。關閉或刷新頁面後將失效。</strong>';
+            document.body.appendChild(qrInfo);
+
+            try {
+                if (!wave || !wave.context) return;
+
+                const mainContext = wave.context;
+                const mainStream = mainContext.createMediaStreamDestination();
+
+
+                const mainDestination = mainContext.createMediaStreamDestination();
+                const wheelDestination = mainContext.createMediaStreamDestination();
+                const wheel2Destination = mainContext.createMediaStreamDestination();
+                const hornDestination = mainContext.createMediaStreamDestination();
+
+                // 連接主要音樂
+                wave.gainNode.connect(mainDestination);
+
+                // 連接兩個輪子音效
+                if (wheelWave && wheelWave.gainNode) {
+                    wheelWave.gainNode.connect(wheelDestination);
+                }
+                if (wheelWave2 && wheelWave2.gainNode) {
+                    wheelWave2.gainNode.connect(wheel2Destination);
+                }
+                if (hornWave && hornWave.gainNode) {
+                    hornWave.gainNode.connect(hornDestination);
+                    hornWave.gainNode.connect(mainContext.destination);
+                }
+                // 確保所有音源都連接到揚聲器
+                wave.gainNode.connect(mainContext.destination);
+                if (wheelWave && wheelWave.gainNode) {
+                    wheelWave.gainNode.connect(mainContext.destination);
+                }
+                if (wheelWave2 && wheelWave2.gainNode) {
+                    wheelWave2.gainNode.connect(mainContext.destination);
+                }
+
+                // 合併所有音軌
+                const combinedTracks = [
+                    ...mainDestination.stream.getAudioTracks(),
+                    ...wheelDestination.stream.getAudioTracks(),
+                    ...wheel2Destination.stream.getAudioTracks(),
+                    ...hornDestination.stream.getAudioTracks()
+                ];
+
+                const combinedStream = new MediaStream(combinedTracks);
+                mediaRecorder = new MediaRecorder(combinedStream);
+
+                // 連接所有音源到錄音目標
+                wave.gainNode.connect(mainStream);
+                wheelWave?.gainNode?.connect(mainStream);
+                wheelWave2?.gainNode?.connect(mainStream);
+                hornWave?.gainNode?.connect(mainStream);
+
+                // 確保連接到揚聲器
+                wave.gainNode.connect(mainContext.destination);
+                wheelWave?.gainNode?.connect(mainContext.destination);
+                wheelWave2?.gainNode?.connect(mainContext.destination);
+                hornWave?.gainNode?.connect(mainContext.destination);
+
+
+                mediaRecorder = new MediaRecorder(mainStream.stream);
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) recordedChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+
+                    try {
+                        // 使用 Promise 包裝 token 請求
+                        const getToken = () => {
+                            return new Promise((resolve, reject) => {
+                                try {
+                                    tokenClient.callback = (resp) => {
+                                        if (resp.error !== undefined) {
+                                            reject(resp);
+                                        }
+                                        resolve(resp.access_token);
+                                    };
+
+                                    if (gapi.client.getToken() === null) {
+                                        tokenClient.requestAccessToken({ prompt: 'consent' });
+                                    } else {
+                                        tokenClient.requestAccessToken({ prompt: '' });
+                                    }
+                                } catch (err) {
+                                    reject(err);
+                                }
+                            });
+                        };
+
+                        // 獲取 token
+                        await getToken();
+
+                        // 準備上傳
+                        const file = new File([blob], 'recorded_audio.webm');
+                        const metadata = {
+                            name: 'recorded_audio.webm',
+                            mimeType: 'audio/webm'
+                        };
+
+                        const form = new FormData();
+                        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                        form.append('file', file);
+
+                        // 上傳到 Drive
+                        const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                            method: 'POST',
+                            headers: new Headers({
+                                'Authorization': 'Bearer ' + gapi.client.getToken().access_token
+                            }),
+                            body: form
+                        });
+
+                        if (!uploadResponse.ok) {
+                            throw new Error('Upload failed: ' + uploadResponse.statusText);
+                        }
+
+                        const data = await uploadResponse.json();
+                        const fileId = data.id;
+                        const shareLink = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
+
+                        // 生成 QR code
+                        qrContainer.innerHTML = '';
+                        const qr = qrcode(0, 'M');
+                        qr.addData(shareLink);
+                        qr.make();
+                        qrContainer.innerHTML = qr.createImgTag(5);
+
+                        // 添加下載連結
+                        const linkInfo = document.createElement('p');
+                        linkInfo.innerHTML = `<a href="${shareLink}" target="_blank" style="color: white; text-decoration: underline;">點擊此處下載錄音</a>`;
+                        qrContainer.appendChild(linkInfo);
+                        qrInfo.style.display = 'block';
+
+                    } catch (error) {
+                        console.error('Upload failed:', error);
+                        qrInfo.innerHTML = '檔案上傳失敗，請重試';
+                        qrInfo.style.display = 'block';
+                    }
+                };
+
+                recordBtn.disabled = false;
+            } catch (err) {
+                console.error('錄音設置失敗:', err);
+                recordBtn.disabled = true;
+            }
+        }
+
+        // 更新錄音計時器
+        function updateRecordingTimer() {
+            if (!isRecording) return;
+
+            const duration = Date.now() - recordingStartTime;
+            const minutes = Math.floor(duration / 60000);
+            const seconds = Math.floor((duration % 60000) / 1000);
+            recordingTimer.textContent =
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // 錄音按鈕事件處理
+        recordBtn.addEventListener('click', () => {
+            if (!isRecording) {
+                // 開始錄音
+                recordedChunks = [];
+                mediaRecorder.start();
+                isRecording = true;
+                recordBtn.textContent = '停止錄音';
+                recordBtn.classList.add('recording');
+                recordingStartTime = Date.now();
+                timerInterval = setInterval(updateRecordingTimer, 1000);
+            } else {
+                // 停止錄音
+                mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.textContent = '開始錄音';
+                recordBtn.classList.remove('recording');
+                clearInterval(timerInterval);
+                recordingTimer.textContent = '00:00';
+            }
+        });
+
+        async function loadAudio(audioUrl, displayName) {
+            status.textContent = '正在載入音樂...';
+
+            try {
+                // 如果有正在播放的音樂，先停止它
+                if (wave && wave.playing) {
+                    wave.destroy();
+                }
+
+                // 初始化新的 wave，但保持 wheelWave 不變
+                wave = new CircularAudioWave(document.getElementById('chart-container'), {
+                    mode: modeSelect.value,
+                    loop: true,
+                    context: wheelWave.context  // 使用與 wheelWave 相同的 context
+                });
+                window.wave = wave;
+
+                // 載入並自動播放新音樂
+                await wave.loadAudio(audioUrl);
+                wave.play();
+                isPlaying = true;
+
+                // 更新狀態和按鈕
+                status.textContent = `播放中: ${displayName}`;
+                playBtn.disabled = true;
+                pauseBtn.disabled = false;
+                stopBtn.disabled = false;
+
+                // 重新設置錄音
+                setupRecording();
+
+            } catch (err) {
+                status.textContent = '載入音樂失敗';
+                console.error(err);
+            }
+        }
+
+        // 事件監聽器保持不變...
+        audioSelect.addEventListener('change', (e) => {
+            const selectedValue = e.target.value;
+            if (selectedValue) {
+                const displayName = e.target.options[e.target.selectedIndex].text;
+                loadAudio(selectedValue, displayName);
+            }
+        });
+
+        playBtn.addEventListener('click', () => {
+            if (wave && !isPlaying) {
+                wave.play();
+                isPlaying = true;
+                playBtn.disabled = true;
+                pauseBtn.disabled = false;
+                status.textContent = '播放中...';
+            }
+        });
+
+        pauseBtn.addEventListener('click', () => {
+            if (wave && isPlaying) {
+                wave.pause();
+                isPlaying = false;
+                playBtn.disabled = false;
+                pauseBtn.disabled = true;
+                status.textContent = '已暫停';
+            }
+        });
+
+        stopBtn.addEventListener('click', () => {
+            if (wave) {
+                wave.destroy();
+                initVisualizer(modeSelect.value);
+                isPlaying = false;
+                playBtn.disabled = false;
+                pauseBtn.disabled = true;
+                stopBtn.disabled = false;
+                status.textContent = '已停止';
+
+                // 如果有已選擇的音樂，重新載入它
+                const selectedAudio = audioSelect.value;
+                if (selectedAudio) {
+                    const displayName = audioSelect.options[audioSelect.selectedIndex].text;
+                    loadAudio(selectedAudio, displayName);
+                }
+            }
+        });
+
+        modeSelect.addEventListener('change', (e) => {
+            const currentlyPlaying = isPlaying;
+            initVisualizer(e.target.value);
+
+            const selectedAudio = audioSelect.value;
+            const displayName = audioSelect.options[audioSelect.selectedIndex].text;
+
+            if (selectedAudio) {
+                loadAudio(selectedAudio, displayName).then(() => {
+                    if (currentlyPlaying) {
+                        wave.play();
+                        isPlaying = true;
+                        playBtn.disabled = true;
+                        pauseBtn.disabled = false;
+                    }
+                });
+            }
+        });
+
+        document.addEventListener('click', function () {
+            if (window.wave && window.wave.context && window.wave.context.state === 'suspended') {
+                window.wave.context.resume();
+            }
+        });
+
+        initVisualizer();
+    </script>
+
+    <!-- React Component -->
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function MultiController() {
+            const [devices, setDevices] = React.useState({
+                wheel: null,
+                wheel2: null,
+                playlist: null,
+                horn: null
+            });
+            const [supported, setSupported] = React.useState(true);
+            const [notifications, setNotifications] = React.useState({});
+
+            React.useEffect(() => {
+                if (!navigator.bluetooth) {
+                    setSupported(false);
+                }
+            }, []);
+
+            const deviceOptions = [
+                { value: "", label: "選擇要連接的裝置" },
+                { value: "wheel", label: "粽子", serviceUUID: "0000180F-0000-1000-8000-00805F9B34FB" },
+                { value: "wheel2", label: "轉速控制器 2", serviceUUID: "0000180F-0000-1000-8000-00805F9B34FB" },
+                { value: "playlist", label: "歌單控制器", serviceUUID: "0000180F-0000-1000-8000-00805F9B34FB" },
+                { value: "horn", label: "喇叭控制器", serviceUUID: "0000180F-0000-1000-8000-00805F9B34FB" }
+            ];
+
+            const getDeviceLabel = (type) => {
+                const device = deviceOptions.find(opt => opt.value === type);
+                return device ? device.label : type;
+            };
+
+            const connectDevice = async (type) => {
+                try {
+                    const deviceOption = deviceOptions.find(d => d.value === type);
+                    if (!deviceOption) return;
+
+                    // 請求藍牙裝置
+                    const device = await navigator.bluetooth.requestDevice({
+                        filters: [
+                            { namePrefix: "ESP32_" },  // 假設所有 ESP32 設備都有此前綴
+                            { services: [deviceOption.serviceUUID] }
+                        ],
+                        optionalServices: ["battery_service"]
+                    });
+
+                    // 連接 GATT Server
+                    const server = await device.gatt.connect();
+
+                    // 獲取服務和特性
+                    const service = await server.getPrimaryService(deviceOption.serviceUUID);
+                    const characteristic = await service.getCharacteristic("00002A19-0000-1000-8000-00805F9B34FB");
+
+                    // 註冊通知以接收藍牙數據
+                    await characteristic.startNotifications();
+
+                    characteristic.addEventListener('characteristicvaluechanged', (event) => {
+                        handleBluetoothData(type, event.target.value);
+                    });
+
+                    setDevices(prev => ({
+                        ...prev,
+                        [type]: {
+                            device,
+                            server,
+                            characteristic,
+                            value: type === 'wheel' ? 1.0 : 0
+                        }
+                    }));
+
+                    // 播放相應音效
+                    if (type === 'wheel' && window.wheelWave) {
+                        try {
+                            window.wheelWave.play();
+                        } catch (err) {
+                            console.error('輪子音效1播放失敗:', err);
+                            setNotification(type, '輪子音效1播放失敗: ' + err.message);
+                        }
+                    } else if (type === 'wheel2' && window.wheelWave2) {
+                        try {
+                            window.wheelWave2.play();
+                        } catch (err) {
+                            console.error('輪子音效2播放失敗:', err);
+                            setNotification(type, '輪子音效2播放失敗: ' + err.message);
+                        }
+                    }
+
+                    setNotification(type, `${getDeviceLabel(type)}已連接成功`);
+                } catch (err) {
+                    console.error('藍牙連接失敗:', err);
+                    setNotification(type, '藍牙連接失敗: ' + err.message);
+                }
+            };
+
+            const setNotification = (type, message) => {
+                setNotifications(prev => ({
+                    ...prev,
+                    [type]: message
+                }));
+
+                // 3秒後清除通知
+                setTimeout(() => {
+                    setNotifications(prev => ({
+                        ...prev,
+                        [type]: null
+                    }));
+                }, 3000);
+            };
+
+            const disconnectDevice = async (type) => {
+                const device = devices[type];
+                if (device) {
+                    try {
+                        // 停止通知
+                        if (device.characteristic) {
+                            await device.characteristic.stopNotifications();
+                        }
+
+                        // 關閉 GATT 連接
+                        if (device.server && device.server.connected) {
+                            device.server.disconnect();
+                        }
+
+                        // 停止相應音效
+                        if (type === 'wheel' && window.wheelWave) {
+                            window.wheelWave.pause();
+                        } else if (type === 'wheel2' && window.wheelWave2) {
+                            window.wheelWave2.pause();
+                        }
+
+                        setDevices(prev => ({
+                            ...prev,
+                            [type]: null
+                        }));
+
+                        setNotification(type, `${getDeviceLabel(type)}已中斷連接`);
+                    } catch (err) {
+                        console.error('中斷連接失敗:', err);
+                        setNotification(type, '中斷連接失敗: ' + err.message);
+                    }
+                }
+            };
+
+            const handleBluetoothData = (type, dataValue) => {
+                // 解析從藍牙裝置收到的資料
+                const decoder = new TextDecoder('utf-8');
+                const data = decoder.decode(dataValue);
+
+                if (type === 'wheel') {
+                    if (data.trim() === 'WHEEL_TRIGGER') {
+                        if (window.wave && window.wheelWave) {
+                            try {
+                                // 確保音訊上下文是活躍的
+                                if (window.wave.context.state === 'suspended') {
+                                    window.wave.context.resume();
+                                }
+
+                                // 建立新的音源節點
+                                const sourceNode = window.wave.context.createBufferSource();
+                                sourceNode.buffer = window.wheelWave._currentBuffer;
+                                sourceNode.connect(window.wave.analyser);
+                                sourceNode.connect(window.wave.context.destination);
+                                sourceNode.start(0);
+                            } catch (err) {
+                                console.error('輪子音效播放失敗:', err);
+                            }
+                        }
+                    }
+                } else if (type === 'wheel2') {
+                    const speedValue = parseFloat(data.trim());
+                    if (!isNaN(speedValue)) {
+                        if (window.wheelWave2 && window.wheelWave2.sourceNode) {
+                            window.wheelWave2.sourceNode.playbackRate.value = speedValue;
+                            if (!window.wheelWave2.playing) {
+                                try {
+                                    window.wheelWave2.play();
+                                } catch (err) {
+                                    console.error('輪子音效2播放失敗:', err);
+                                }
+                            }
+                        }
+                    }
+                } else if (type === 'playlist') {
+                    if (data.trim() === 'SELECT_MUSIC_1' ||
+                        data.trim() === 'SELECT_MUSIC_2' ||
+                        data.trim() === 'SELECT_MUSIC_3') {
+                        const index = parseInt(data.trim().slice(-1));
+                        const audioSelect = document.getElementById('audioSelect');
+                        if (audioSelect) {
+                            audioSelect.selectedIndex = index;
+                            audioSelect.dispatchEvent(new Event('change'));
+                        }
+                    }
+                } else if (type === 'horn') {
+                    if (data.trim() === 'PLAY_HORN') {
+                        if (window.hornWave) {
+                            try {
+                                const currentContext = window.wave.context;
+                                const sourceNode = currentContext.createBufferSource();
+                                sourceNode.buffer = window.hornWave._currentBuffer;
+                                sourceNode.connect(window.wave.analyser);
+                                sourceNode.connect(currentContext.destination);
+                                sourceNode.start(0);
+                            } catch (err) {
+                                console.error('喇叭音效播放失敗:', err);
+                            }
+                        }
+                    }
+                }
+            };
+
+            const handleDeviceSelect = async (e) => {
+                const selectedValue = e.target.value;
+                if (selectedValue) {
+                    await connectDevice(selectedValue);
+                }
+            };
+
+            if (!supported) {
+                return (
+                    <div className="p-4 bg-red-500 text-white rounded">
+                        您的瀏覽器不支援藍牙連接功能，請使用支援 Web Bluetooth API 的瀏覽器。
+                    </div>
+                );
+            }
+
+            return (
+                <div className="p-4">
+                    <div className="flex flex-col gap-4 mb-4">
+                        <select
+                            onChange={handleDeviceSelect}
+                            className="select bg-gray-700 text-white p-2 rounded cursor-pointer hover:bg-gray-600"
+                        >
+                            {deviceOptions.map(option => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+
+                        {Object.entries(devices).map(([type, device]) =>
+                            device && (
+                                <div key={type} className="bg-gray-700 p-3 rounded mb-2">
+                                    <div className="text-white">
+                                        {getDeviceLabel(type)}已連接
+                                    </div>
+                                    <button
+                                        onClick={() => disconnectDevice(type)}
+                                        className="text-red-400 hover:text-red-300"
+                                    >
+                                        中斷連接
+                                    </button>
+                                </div>
+                            )
+                        )}
+
+                        {Object.entries(notifications).map(([type, message]) =>
+                            message && (
+                                <div key={`notification-${type}`} className="bg-blue-500 p-2 rounded text-white">
+                                    {message}
+                                </div>
+                            )
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        window.onload = function () {
+            const container = document.getElementById('serial-controls');
+            if (container) {
+                ReactDOM.createRoot(container).render(<MultiController />);
+            } else {
+                console.error('Container not found');
+            }
+        }
+
+    </script>
+    <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+    <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+</body>
