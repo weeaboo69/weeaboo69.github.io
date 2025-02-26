@@ -379,8 +379,73 @@
         let gisInited = false;
 
         function gapiLoaded() {
-            gapi.load('client', initializeGapiClient);
+            gapi.load('client', async () => {
+                try {
+                    await gapi.client.init({
+                        apiKey: API_KEY,
+                        discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
+                    });
+                    gapiInited = true;
+                    maybeEnableButtons();
+                } catch (error) {
+                    console.error('GAPI 初始化錯誤:', error);
+                }
+            });
         }
+
+        function gisLoaded() {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                prompt: '',  // 使用空字串可以減少不必要的提示
+                callback: (resp) => {
+                    if (resp.error !== undefined) {
+                        console.error('授權錯誤:', resp);
+                        return;
+                    }
+                    // 授權成功後的處理
+                    console.log('授權成功');
+                }
+            });
+            gisInited = true;
+            maybeEnableButtons();
+        }
+
+        // 在頁面載入時就嘗試自動登入
+        function tryAutoSignIn() {
+            if (gapiInited && gisInited) {
+                // 檢查是否已有有效的 token
+                if (gapi.client.getToken() === null) {
+                    // 可以選擇在這裡自動請求授權，或者等到用戶操作時再請求
+                    console.log('未登入狀態，等待用戶操作');
+                } else {
+                    console.log('已有有效的授權');
+                }
+            }
+        }
+
+        function maybeEnableButtons() {
+            if (gapiInited && gisInited) {
+                console.log('Google API 初始化完成');
+                tryAutoSignIn();
+            }
+        }
+
+        // 添加這個處理授權過期的函數
+        function handleTokenExpired() {
+            // 當 token 過期時，靜默刷新
+            tokenClient.callback = (resp) => {
+                if (resp.error !== undefined) {
+                    // 如果靜默刷新失敗，則需要用戶交互
+                    console.error('Token 刷新失敗:', resp);
+                } else {
+                    console.log('Token 已刷新');
+                }
+            };
+
+            // 嘗試靜默刷新 token
+            tokenClient.requestAccessToken({ prompt: '' });
+        }}
 
         async function initializeGapiClient() {
             await gapi.client.init({
@@ -562,78 +627,29 @@
                     const blob = new Blob(recordedChunks, { type: 'audio/webm' });
 
                     try {
-                        // 使用 Promise 包裝 token 請求
-                        const getToken = () => {
-                            return new Promise((resolve, reject) => {
-                                try {
-                                    tokenClient.callback = (resp) => {
-                                        if (resp.error !== undefined) {
-                                            reject(resp);
-                                        }
-                                        resolve(resp.access_token);
-                                    };
-
-                                    if (gapi.client.getToken() === null) {
-                                        tokenClient.requestAccessToken({ prompt: 'consent' });
-                                    } else {
-                                        tokenClient.requestAccessToken({ prompt: '' });
-                                    }
-                                } catch (err) {
-                                    reject(err);
+                        // 檢查是否已經有有效的 token
+                        if (gapi.client.getToken() === null) {
+                            // 只有在沒有 token 時才請求新的 token
+                            tokenClient.callback = async (resp) => {
+                                if (resp.error !== undefined) {
+                                    throw resp;
                                 }
-                            });
-                        };
-
-                        // 獲取 token
-                        await getToken();
-
-                        // 準備上傳
-                        const file = new File([blob], 'recorded_audio.webm');
-                        const metadata = {
-                            name: 'recorded_audio.webm',
-                            mimeType: 'audio/webm'
-                        };
-
-                        const form = new FormData();
-                        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-                        form.append('file', file);
-
-                        // 上傳到 Drive
-                        const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-                            method: 'POST',
-                            headers: new Headers({
-                                'Authorization': 'Bearer ' + gapi.client.getToken().access_token
-                            }),
-                            body: form
-                        });
-
-                        if (!uploadResponse.ok) {
-                            throw new Error('Upload failed: ' + uploadResponse.statusText);
+                                // 有了 token 後繼續上傳流程
+                                await uploadFile(blob);
+                            };
+                            tokenClient.requestAccessToken({ prompt: 'consent' });
+                        } else {
+                            // 已有 token，直接進行上傳
+                            await uploadFile(blob);
                         }
-
-                        const data = await uploadResponse.json();
-                        const fileId = data.id;
-                        const shareLink = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
-
-                        // 生成 QR code
-                        qrContainer.innerHTML = '';
-                        const qr = qrcode(0, 'M');
-                        qr.addData(shareLink);
-                        qr.make();
-                        qrContainer.innerHTML = qr.createImgTag(5);
-
-                        // 添加下載連結
-                        const linkInfo = document.createElement('p');
-                        linkInfo.innerHTML = `<a href="${shareLink}" target="_blank" style="color: white; text-decoration: underline;">點擊此處下載錄音</a>`;
-                        qrContainer.appendChild(linkInfo);
-                        qrInfo.style.display = 'block';
-
                     } catch (error) {
                         console.error('Upload failed:', error);
                         qrInfo.innerHTML = '檔案上傳失敗，請重試';
                         qrInfo.style.display = 'block';
                     }
                 };
+
+
 
                 recordBtn.disabled = false;
             } catch (err) {
@@ -674,6 +690,49 @@
                 recordingTimer.textContent = '00:00';
             }
         });
+
+        async function uploadFile(blob) {
+            // 準備上傳
+            const file = new File([blob], 'recorded_audio.webm');
+            const metadata = {
+                name: 'recorded_audio.webm',
+                mimeType: 'audio/webm'
+            };
+
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            form.append('file', file);
+
+            // 上傳到 Drive
+            const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                method: 'POST',
+                headers: new Headers({
+                    'Authorization': 'Bearer ' + gapi.client.getToken().access_token
+                }),
+                body: form
+            });
+
+            if (!uploadResponse.ok) {
+                throw new Error('Upload failed: ' + uploadResponse.statusText);
+            }
+
+            const data = await uploadResponse.json();
+            const fileId = data.id;
+            const shareLink = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
+
+            // 生成 QR code
+            qrContainer.innerHTML = '';
+            const qr = qrcode(0, 'M');
+            qr.addData(shareLink);
+            qr.make();
+            qrContainer.innerHTML = qr.createImgTag(5);
+
+            // 添加下載連結
+            const linkInfo = document.createElement('p');
+            linkInfo.innerHTML = `<a href="${shareLink}" target="_blank" style="color: white; text-decoration: underline;">點擊此處下載錄音</a>`;
+            qrContainer.appendChild(linkInfo);
+            qrInfo.style.display = 'block';
+        }
 
         async function loadAudio(audioUrl, displayName) {
             status.textContent = '正在載入音樂...';
