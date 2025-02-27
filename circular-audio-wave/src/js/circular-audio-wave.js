@@ -343,9 +343,13 @@ class CircularAudioWave {
             this.playing = false;
             const currentRate = this.sourceNode.playbackRate.value;  // 保存當前速度
 
-            // 在重新創建音訊上下文之前，先檢查當前上下文的狀態
-            if (this.context.state !== 'closed') {
-                this.context.close();
+            // 安全地檢查並關閉 AudioContext
+            try {
+                if (this.context && this.context.state !== 'closed') {
+                    this.context.close();
+                }
+            } catch (error) {
+                console.warn('AudioContext 關閉時發生錯誤:', error);
             }
 
             this.sourceNode.buffer = null;
