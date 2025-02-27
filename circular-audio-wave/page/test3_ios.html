@@ -1041,60 +1041,31 @@
             };
 
             // 處理輪子2速度值
-            const handleWheel2SpeedValue = (dataValue) => {
-                // 檢查是否為停止播放指令
-                if (dataValue === "STOP_PLAYBACK") {
-                    console.log("收到停止播放指令");
-                    if (window.wave && window.wave.playing) {
-                        window.wave.pause();
+            const handleWheel2SpeedValue = (speedValue) => {
+                // 將 0-100 的值映射到播放速度範圍 (例如 0.5-2.0)
+                const playbackRate = 0.5 + (speedValue / 100) * 1.5;
 
-                        // 更新 UI 元素
-                        const playBtn = document.getElementById('playBtn');
-                        const pauseBtn = document.getElementById('pauseBtn');
-                        const status = document.getElementById('status');
+                if (window.wheelWave2) {
+                    try {
+                        // 確保音檔已經載入
+                        if (window.wheelWave2._currentBuffer) {
+                            // 重新建立 sourceNode
+                            const sourceNode = window.wave.context.createBufferSource();
+                            sourceNode.buffer = window.wheelWave2._currentBuffer;
+                            sourceNode.playbackRate.value = playbackRate;
+                            sourceNode.connect(window.wave.analyser);
+                            sourceNode.connect(window.wave.context.destination);
+                            sourceNode.start(0);
 
-                        if (playBtn) playBtn.disabled = false;
-                        if (pauseBtn) pauseBtn.disabled = true;
-                        if (status) status.textContent = '已停止（感測器超時）';
-                    }
-                    return;
-                }
-
-                // 處理速度值
-                const speedValue = parseFloat(dataValue);
-                if (!isNaN(speedValue)) {
-                    // 將速度值應用到主音樂
-                    if (window.wave && window.wave.sourceNode) {
-                        // 確保音訊上下文是活躍的
-                        if (window.wave.context.state === 'suspended') {
-                            window.wave.context.resume();
+                            console.log(`輪子2速度已設為: ${playbackRate.toFixed(2)}x`);
+                        } else {
+                            console.error('輪子2音檔尚未載入');
                         }
-
-                        window.wave.setPlaybackRate(speedValue);
-                        speedValue.textContent = `${speedValue.toFixed(2)}x`;
-
-                        // 如果音樂處於暫停狀態，而現在有活動，則自動恢復播放
-                        if (!isPlaying && window.wave) {
-                            window.wave.play();
-                            isPlaying = true;
-                            playBtn.disabled = true;
-                            pauseBtn.disabled = false;
-                            status.textContent = '播放中...';
-                        }
+                    } catch (err) {
+                        console.error('輪子音效2播放失敗:', err);
                     }
-
-                    // 同時也應用到輪子2的音效
-                    if (window.wheelWave2 && window.wheelWave2.sourceNode) {
-                        window.wheelWave2.sourceNode.playbackRate.value = speedValue;
-                        if (!window.wheelWave2.playing) {
-                            try {
-                                window.wheelWave2.play();
-                            } catch (err) {
-                                console.error('輪子音效2播放失敗:', err);
-                            }
-                        }
-                    }
-                    console.log(`輪子2速度已設為: ${speedValue.toFixed(2)}x`);
+                } else {
+                    console.error('wheelWave2 未初始化');
                 }
             };
             // 處理歌單選擇
