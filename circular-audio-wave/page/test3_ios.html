@@ -1027,10 +1027,8 @@
                 if (value === 100 && window.wave) {
                     console.log('輪子觸發開始');
                     try {
-                        // 重新創建輪子音效
-                        if (window.wheelWave) {
-                            window.wheelWave.destroy(); // 銷毀舊的
-                        }
+                        // 創建新的音訊上下文
+                        const audioContext = new AudioContext();
 
                         // 創建隱藏容器
                         const hiddenContainer = document.createElement('div');
@@ -1038,16 +1036,24 @@
                         document.body.appendChild(hiddenContainer);
 
                         // 創建新的 CircularAudioWave
-                        window.wheelWave = new CircularAudioWave(hiddenContainer, {
+                        const newWheelWave = new CircularAudioWave(hiddenContainer, {
                             loop: false,
-                            context: window.wave.context
+                            context: audioContext
                         });
 
+                        // 銷毀舊的輪子音效（如果存在）
+                        if (window.wheelWave) {
+                            window.wheelWave.destroy();
+                        }
+
+                        // 更新全局引用
+                        window.wheelWave = newWheelWave;
+
                         // 載入並播放音效
-                        window.wheelWave.loadAudio('audio/RDP.wav')
+                        newWheelWave.loadAudio('audio/RDP.wav')
                             .then(() => {
                                 console.log('輪子音效載入成功');
-                                window.wheelWave.play();
+                                newWheelWave.play();
                             })
                             .catch((error) => {
                                 console.error('輪子音效載入失敗:', error);

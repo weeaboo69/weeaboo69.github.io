@@ -314,6 +314,7 @@ class CircularAudioWave {
         }
     }
     destroy() {
+        // 停止播放
         if (this.playing) {
             try {
                 this.sourceNode.stop();
@@ -328,8 +329,7 @@ class CircularAudioWave {
         // 安全地斷開所有連接
         if (this.sourceNode) {
             try {
-                this.sourceNode.disconnect(this.analyser);
-                this.sourceNode.disconnect(this.gainNode);
+                this.sourceNode.disconnect();
             } catch (error) {
                 console.warn('斷開音訊節點連接時發生錯誤:', error);
             }
@@ -343,11 +343,21 @@ class CircularAudioWave {
         // 嘗試關閉音訊上下文，但不要拋出異常
         try {
             if (this.context && this.context.state !== 'closed') {
+                // 先掛起所有連接的節點
+                if (this.gainNode) this.gainNode.disconnect();
+                if (this.analyser) this.analyser.disconnect();
+                
                 this.context.close();
             }
         } catch (error) {
             console.warn('關閉音訊上下文時發生錯誤:', error);
         }
+        
+        // 重置關鍵屬性
+        this.sourceNode = null;
+        this.gainNode = null;
+        this.analyser = null;
+        this._currentBuffer = null;
     }
 
     setVolume(value) {
