@@ -1023,32 +1023,36 @@
 
             // 處理輪子觸發
             const handleWheelTrigger = (value) => {
-                // 假設值為 100 表示觸發輪子
-                if (value === 100 && window.wave && window.wheelWave) {
-                    try {
-                        // 確保音訊上下文是活躍的
-                        if (window.wave.context.state === 'suspended') {
-                            window.wave.context.resume();
-                        }
-
-                        // 如果有正在播放的輪子音效，先停止
-                        if (window.wheelWave && window.wheelWave.playing) {
-                            window.wheelWave.destroy();
-                        }
-
-                        // 建立新的音源節點
-                        const sourceNode = window.wave.context.createBufferSource();
-                        sourceNode.buffer = window.wheelWave._currentBuffer;
-                        sourceNode.connect(window.wave.analyser);
-                        sourceNode.connect(window.wave.context.destination);
-                        sourceNode.start(0);
-
-                        console.log('輪子音效已觸發');
-                    } catch (err) {
-                        console.error('輪子音效播放失敗:', err);
-                    }
-                }
+    // 假設值為 100 表示觸發輪子
+    if (value === 100 && window.wave && window.wheelWave) {
+        try {
+            // 確保音訊上下文是活躍的
+            if (window.wave.context.state === 'suspended') {
+                window.wave.context.resume();
             }
+
+            // 如果有正在播放的輪子音效，先停止
+            if (window.wheelWave && window.wheelWave.playing) {
+                window.wheelWave.destroy();
+            }
+
+            // 重新載入並初始化 wheelWave
+            window.wheelWave = new CircularAudioWave(document.createElement('div'), {
+                loop: false,
+                context: window.wave.context
+            });
+
+            // 載入音效並播放
+            window.wheelWave.loadAudio('audio/RDP.wav').then(() => {
+                window.wheelWave.play();
+            });
+
+            console.log('輪子音效已觸發');
+        } catch (err) {
+            console.error('輪子音效播放失敗:', err);
+        }
+    }
+}
 
             // 處理輪子2速度值
             const handleWheel2SpeedValue = (dataValue) => {
