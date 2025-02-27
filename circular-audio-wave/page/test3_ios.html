@@ -740,14 +740,23 @@
             try {
                 // 如果有正在播放的音樂，先完全銷毀它
                 if (wave) {
-                    wave.destroy(); // 確保銷毀當前的 wave
+                    try {
+                        wave.destroy(); // 安全地銷毀當前的 wave
+                    } catch (error) {
+                        console.warn('銷毀舊 wave 時發生錯誤:', error);
+                    }
                 }
+
+                // 初始化新的音訊上下文（如果之前的已關閉）
+                const audioContext = wheelWave.context.state === 'closed'
+                    ? new AudioContext()
+                    : wheelWave.context;
 
                 // 初始化新的 wave，但保持 wheelWave 不變
                 wave = new CircularAudioWave(document.getElementById('chart-container'), {
                     mode: modeSelect.value,
                     loop: true,
-                    context: wheelWave.context  // 使用與 wheelWave 相同的 context
+                    context: audioContext  // 使用新的或現有的 context
                 });
                 window.wave = wave;
 
