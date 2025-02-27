@@ -314,50 +314,16 @@ class CircularAudioWave {
         }
     }
     destroy() {
-        // 停止播放
         if (this.playing) {
-            try {
-                this.sourceNode.stop();
-            } catch (error) {
-                console.warn('停止音訊時發生錯誤:', error);
-            }
+            this.sourceNode.stop();
         }
-        
         this.playing = false;
         this.pausedAt = 0;
-        
-        // 安全地斷開所有連接
-        if (this.sourceNode) {
-            try {
-                this.sourceNode.disconnect();
-            } catch (error) {
-                console.warn('斷開音訊節點連接時發生錯誤:', error);
-            }
+        this.chart.dispose();
+        // 清理音頻相關資源
+        if (this.context) {
+            this.context.close();
         }
-        
-        // 銷毀圖表
-        if (this.chart) {
-            this.chart.dispose();
-        }
-        
-        // 嘗試關閉音訊上下文，但不要拋出異常
-        try {
-            if (this.context && this.context.state !== 'closed') {
-                // 先掛起所有連接的節點
-                if (this.gainNode) this.gainNode.disconnect();
-                if (this.analyser) this.analyser.disconnect();
-                
-                this.context.close();
-            }
-        } catch (error) {
-            console.warn('關閉音訊上下文時發生錯誤:', error);
-        }
-        
-        // 重置關鍵屬性
-        this.sourceNode = null;
-        this.gainNode = null;
-        this.analyser = null;
-        this._currentBuffer = null;
     }
 
     setVolume(value) {
