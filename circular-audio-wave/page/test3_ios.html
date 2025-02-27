@@ -1031,6 +1031,11 @@
                             window.wave.context.resume();
                         }
 
+                        // 如果有正在播放的輪子音效，先停止
+                        if (window.wheelWave && window.wheelWave.playing) {
+                            window.wheelWave.destroy();
+                        }
+
                         // 建立新的音源節點
                         const sourceNode = window.wave.context.createBufferSource();
                         sourceNode.buffer = window.wheelWave._currentBuffer;
@@ -1043,7 +1048,7 @@
                         console.error('輪子音效播放失敗:', err);
                     }
                 }
-            };
+            }
 
             // 處理輪子2速度值
             const handleWheel2SpeedValue = (dataValue) => {
