@@ -1140,17 +1140,169 @@
                     // 監聽通知，根據設備類型處理不同邏輯
                     characteristic.addEventListener('characteristicvaluechanged', (event) => {
                         const value = event.target.value;
-                        const dataValue = value.getUint8(0);
 
-                        // 根據設備類型處理不同邏輯
-                        if (type === 'horn') {
-                            handleHornPositionValue(dataValue);
-                        } else if (type === 'wheel') {
-                            handleWheelTrigger(dataValue);
-                        } else if (type === 'wheel2') {
-                            handleWheel2SpeedValue(dataValue);
-                        } else if (type === 'playlist') {
-                            handlePlaylistSelection(dataValue);
+                        try {
+                            // 嘗試將數據解碼為文本
+                            const decoder = new TextDecoder('utf-8');
+                            const textData = decoder.decode(value.buffer);
+
+                            // 根據設備類型處理不同邏輯
+                            if (type === 'horn') {
+                                handleHornPositionValue(parseInt(textData, 10));
+                            } else if (type === 'wheel') {
+                                if (textData.trim() === "WHEEL_TRIGGER") {
+                                    // 處理輪子觸發的邏輯
+                                    console.log("收到輪子觸發指令");
+                                    if (window.wave && window.wheelWave) {
+                                        try {
+                                            // 確保音訊上下文是活躍的
+                                            if (window.wave.context.state === 'suspended') {
+                                                window.wave.context.resume();
+                                            }
+
+                                            // 建立新的音源節點
+                                            const sourceNode = window.wave.context.createBufferSource();
+                                            sourceNode.buffer = window.wheelWave._currentBuffer;
+                                            sourceNode.connect(window.wave.analyser);
+                                            sourceNode.connect(window.wave.context.destination);
+                                            sourceNode.start(0);
+
+                                            console.log('輪子音效已觸發');
+                                        } catch (err) {
+                                            console.error('輪子音效播放失敗:', err);
+                                        }
+                                    }
+                                }
+                            } else if (type === 'wheel2') {
+                                // 檢查是否是 "STOP_PLAYBACK" 指令
+                                if (textData.trim() === "STOP_PLAYBACK") {
+                                    console.log("收到停止播放指令");
+                                    if (window.wave && window.wave.playing) {
+                                        window.wave.pause();
+
+                                        // 更新 UI 元素
+                                        const playBtn = document.getElementById('playBtn');
+                                        const pauseBtn = document.getElementById('pauseBtn');
+                                        const status = document.getElementById('status');
+
+                                        if (playBtn) playBtn.disabled = false;
+                                        if (pauseBtn) pauseBtn.disabled = true;
+                                        if (status) status.textContent = '已停止（感測器超時）';
+
+                                        setDevices(prev => ({
+                                            ...prev,
+                                            wheel2: {
+                                                ...prev.wheel2,
+                                                isPlaying: false
+                                            }
+                                        }));
+                                    }
+                                } else {
+                                    // 如果不是停止指令，嘗試將其解析為速度值
+                                    const speedValue = parseFloat(textData.trim());
+                                    if (!isNaN(speedValue)) {
+                                        console.log(`收到速度值: ${speedValue}`);
+
+                                        // 將速度值應用到主音樂
+                                        if (window.wave) {
+                                            // 確保音訊上下文是活躍的
+                                            if (window.wave.context && window.wave.context.state === 'suspended') {
+                                                window.wave.context.resume();
+                                            }
+
+                                            // 設置播放速度
+                                            if (window.wave.setPlaybackRate) {
+                                                window.wave.setPlaybackRate(speedValue);
+                                            } else if (window.wave.sourceNode && window.wave.sourceNode.playbackRate) {
+                                                window.wave.sourceNode.playbackRate.value = speedValue;
+                                            }
+
+                                            // 更新顯示的速度值
+                                            const speedValueElement = document.getElementById('speedValue');
+                                            if (speedValueElement) {
+                                                speedValueElement.textContent = `${speedValue.toFixed(2)}x`;
+                                            }
+
+                                            // 如果音樂處於暫停狀態，而現在有活動，則自動恢復播放
+                                            if (window.wave.play && !window.wave.playing) {
+                                                window.wave.play();
+
+                                                // 更新 UI 元素
+                                                const playBtn = document.getElementById('playBtn');
+                                                const pauseBtn = document.getElementById('pauseBtn');
+                                                const status = document.getElementById('status');
+
+                                                if (playBtn) playBtn.disabled = true;
+                                                if (pauseBtn) pauseBtn.disabled = false;
+                                                if (status) status.textContent = '播放中...';
+                                            }
+                                        }
+
+                                        // 同時也應用到輪子2的音效
+                                        if (window.wheelWave2 && window.wheelWave2.sourceNode) {
+                                            window.wheelWave2.sourceNode.playbackRate.value = speedValue;
+                                            if (!window.wheelWave2.playing && window.wheelWave2.play) {
+                                                try {
+                                                    window.wheelWave2.play();
+                                                } catch (err) {
+                                                    console.error('輪子音效2播放失敗:', err);
+                                                }
+                                            }
+                                        }
+
+                                        // 更新設備狀態
+                                        setDevices(prev => ({
+                                            ...prev,
+                                            wheel2: {
+                                                ...prev.wheel2,
+                                                value: speedValue,
+                                                isPlaying: true
+                                            }
+                                        }));
+                                    }
+                                }
+                            } else if (type === 'playlist') {
+                                if (textData === "SELECT_MUSIC_1" ||
+                                    textData === "SELECT_MUSIC_2" ||
+                                    textData === "SELECT_MUSIC_3") {
+
+                                    console.log("收到選擇歌曲指令:", textData);
+
+                                    // 根據指令選擇對應的歌曲
+                                    const index = parseInt(textData.slice(-1));
+                                    const audioSelect = document.getElementById('audioSelect');
+                                    if (audioSelect) {
+                                        audioSelect.selectedIndex = index;
+                                        audioSelect.dispatchEvent(new Event('change'));
+                                        console.log(`已選擇歌曲 ${index}`);
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.error('解碼 BLE 數據失敗:', e);
+
+                            // 嘗試原始方式讀取數據
+                            const dataValue = value.getUint8(0);
+
+                            if (type === 'horn') {
+                                handleHornPositionValue(dataValue);
+                            } else if (type === 'wheel') {
+                                handleWheelTrigger(dataValue);
+                            } else if (type === 'wheel2') {
+                                // 將 0-255 的值映射到適合的範圍
+                                const speedValue = 0.5 + (dataValue / 255) * 4.5;
+
+                                // 處理速度邏輯...
+                                if (window.wave && window.wave.sourceNode) {
+                                    if (window.wave.setPlaybackRate) {
+                                        window.wave.setPlaybackRate(speedValue);
+                                    } else {
+                                        window.wave.sourceNode.playbackRate.value = speedValue;
+                                    }
+                                }
+                            } else if (type === 'playlist') {
+                                // 處理歌單選擇邏輯...
+                            }
                         }
                     });
 
@@ -1173,22 +1325,6 @@
                             setNotification(type, '輪子音效1播放失敗: ' + err.message);
                         }
                     } else if (type === 'wheel2' && window.wheelWave2) {
-                        if (textData === "STOP_PLAYBACK") {
-                            // 如果收到停止播放指令
-                            console.log("收到停止播放指令");
-                            if (window.wave && window.wave.playing) {
-                                window.wave.pause();
-
-                                // 更新 UI 元素
-                                const playBtn = document.getElementById('playBtn');
-                                const pauseBtn = document.getElementById('pauseBtn');
-                                const status = document.getElementById('status');
-
-                                if (playBtn) playBtn.disabled = false;
-                                if (pauseBtn) pauseBtn.disabled = true;
-                                if (status) status.textContent = '已停止（感測器超時）';
-                            }
-                        }
                         try {
                             window.wheelWave2.play();
                         } catch (err) {
