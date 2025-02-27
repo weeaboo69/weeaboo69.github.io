@@ -1027,10 +1027,14 @@
                 if (value === 100 && window.wave) {
                     console.log('輪子觸發開始');
                     try {
-                        // 如果當前音訊上下文已關閉，創建新的
-                        const audioContext = window.wave.context.state === 'closed'
-                            ? new AudioContext()
-                            : window.wave.context;
+                        // 確保音訊上下文處於活躍狀態
+                        let audioContext = window.wave.context;
+
+                        // 如果音訊上下文已關閉，創建新的
+                        if (audioContext.state === 'closed') {
+                            audioContext = new AudioContext();
+                            console.log('創建新的音訊上下文');
+                        }
 
                         // 確保音訊上下文是活躍的
                         if (audioContext.state === 'suspended') {
@@ -1038,7 +1042,7 @@
                             console.log('恢復音訊上下文');
                         }
 
-                        // 重新創建音效的音源節點
+                        // 重新載入音效
                         const sourceNode = audioContext.createBufferSource();
 
                         // 檢查音效緩衝區是否存在
@@ -1047,28 +1051,37 @@
                             return;
                         }
 
-                        sourceNode.buffer = window.wheelWave._currentBuffer;
+                        // 重新解碼音效緩衝區
+                        audioContext.decodeAudioData(
+                            window.wheelWave._currentBuffer.getChannelData(0).buffer,
+                            (buffer) => {
+                                sourceNode.buffer = buffer;
 
-                        // 創建增益節點控制音量
-                        const gainNode = audioContext.createGain();
-                        gainNode.gain.value = 1.0; // 可以調整音量
+                                // 創建增益節點控制音量
+                                const gainNode = audioContext.createGain();
+                                gainNode.gain.value = 1.0;
 
-                        // 創建分析器
-                        const analyser = audioContext.createAnalyser();
+                                // 創建分析器
+                                const analyser = audioContext.createAnalyser();
 
-                        // 連接節點
-                        sourceNode.connect(gainNode);
-                        gainNode.connect(analyser);
-                        gainNode.connect(audioContext.destination);
+                                // 連接節點
+                                sourceNode.connect(gainNode);
+                                gainNode.connect(analyser);
+                                gainNode.connect(audioContext.destination);
 
-                        // 播放音效
-                        sourceNode.start(0);
-                        console.log('輪子音效已播放');
+                                // 播放音效
+                                sourceNode.start(0);
+                                console.log('輪子音效已播放');
 
-                        // 監聽音效播放結束事件
-                        sourceNode.onended = () => {
-                            console.log('輪子音效播放結束');
-                        };
+                                // 監聽音效播放結束事件
+                                sourceNode.onended = () => {
+                                    console.log('輪子音效播放結束');
+                                };
+                            },
+                            (error) => {
+                                console.error('音效解碼失敗:', error);
+                            }
+                        );
 
                     } catch (err) {
                         console.error('輪子音效播放失敗:', err);
