@@ -881,6 +881,7 @@
             };
 
             // 處理喇叭位置值
+            // 處理喇叭位置值
             const handleHornPositionValue = (dataValue) => {
                 // 檢查是否是播放指令 (254)
                 if (dataValue === 254) {
@@ -892,12 +893,22 @@
                                 window.wave.context.resume();
                             }
 
-                            // 建立新的音源節點並從頭播放
+                            // 保存當前播放的音效節點以便後續控制
                             const sourceNode = window.wave.context.createBufferSource();
                             sourceNode.buffer = window.hornWave._currentBuffer;
                             sourceNode.connect(window.wave.analyser);
                             sourceNode.connect(window.wave.context.destination);
                             sourceNode.start(0);
+
+                            // 保存到設備狀態中，以便後續更新位置
+                            setDevices(prev => ({
+                                ...prev,
+                                horn: {
+                                    ...prev.horn,
+                                    sourceNode: sourceNode,
+                                    value: 0
+                                }
+                            }));
 
                             console.log('喇叭音效已觸發');
                         } catch (err) {
@@ -907,21 +918,40 @@
                 }
                 // 一般位置值 (0-100)
                 else if (dataValue <= 100) {
-                    // 只更新進度條或顯示，不重新播放
+                    // 更新進度並控制播放位置
                     setDevices(prev => {
-                        if (prev.horn) {
-                            return {
-                                ...prev,
-                                horn: {
-                                    ...prev.horn,
-                                    value: dataValue
-                                }
-                            };
+                        if (prev.horn && prev.horn.sourceNode && window.hornWave && window.hornWave._currentBuffer) {
+                            try {
+                                // 停止當前播放
+                                prev.horn.sourceNode.stop();
+
+                                // 創建新的播放源，從計算的位置開始播放
+                                const bufferDuration = window.hornWave._currentBuffer.duration;
+                                const newPosition = (dataValue / 100) * bufferDuration;
+
+                                const newSourceNode = window.wave.context.createBufferSource();
+                                newSourceNode.buffer = window.hornWave._currentBuffer;
+                                newSourceNode.connect(window.wave.analyser);
+                                newSourceNode.connect(window.wave.context.destination);
+                                newSourceNode.start(0, newPosition);
+
+                                console.log(`喇叭位置更新: ${dataValue}%, ${newPosition.toFixed(2)}秒`);
+
+                                // 返回更新後的狀態
+                                return {
+                                    ...prev,
+                                    horn: {
+                                        ...prev.horn,
+                                        sourceNode: newSourceNode,
+                                        value: dataValue
+                                    }
+                                };
+                            } catch (err) {
+                                console.error('更新喇叭位置失敗:', err);
+                            }
                         }
                         return prev;
                     });
-
-                    console.log(`喇叭位置: ${dataValue}%`);
                 }
             };
 
