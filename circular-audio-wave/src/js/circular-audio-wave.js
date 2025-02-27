@@ -217,24 +217,33 @@ class CircularAudioWave {
         this.chartOption = JSON.parse(JSON.stringify(this.defaultChartOption));
     }
     loadAudio(filePath) {
-        console.log(filePath);
+        console.log('Loading audio:', filePath);
         this.filePath = filePath;
         this._setupAudioNodes();
         this._setupOfflineContext();
+
         var request = new XMLHttpRequest();
         request.open('GET', filePath, true);
         request.responseType = 'arraybuffer';
         request.send();
+
         return new Promise((resolve, reject) => {
             request.onload = () => {
-                // Preprocess buffer for bpm
-                this.offlineContext.decodeAudioData(request.response, buffer => {
-                    this._currentBuffer = buffer; // 保存當前的 buffer
-                    this.sourceNode.buffer = buffer;
-                    this.offlineSource.buffer = buffer;
-                    this.offlineSource.start(0);
-                    this.offlineContext.startRendering();
-                });
+                // 預處理 buffer
+                this.offlineContext.decodeAudioData(
+                    request.response,
+                    buffer => {
+                        this._currentBuffer = buffer; // 儲存當前的 buffer
+                        this.sourceNode.buffer = buffer;
+                        this.offlineSource.buffer = buffer;
+                        this.offlineSource.start(0);
+                        this.offlineContext.startRendering();
+                    },
+                    error => {
+                        console.error('音訊解碼錯誤:', error);
+                        reject(error);
+                    }
+                );
 
                 this.offlineContext.oncomplete = e => {
                     let buffer = e.renderedBuffer;
@@ -242,6 +251,11 @@ class CircularAudioWave {
                     this._init();
                     resolve();
                 };
+            };
+
+            request.onerror = (error) => {
+                console.error('音訊載入錯誤:', error);
+                reject(error);
             };
         });
     }
