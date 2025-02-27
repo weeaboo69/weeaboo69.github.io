@@ -1023,44 +1023,59 @@
 
             // 處理輪子觸發
             const handleWheelTrigger = (value) => {
-                // 假設值為 100 表示觸發輪子
                 if (value === 100 && window.wave) {
-                    console.log('輪子觸發開始');
+                    console.log('輪子觸發開始 - 完整診斷');
+
                     try {
-                        // 創建新的音訊上下文
-                        const audioContext = new AudioContext();
-
-                        // 創建隱藏容器
-                        const hiddenContainer = document.createElement('div');
-                        hiddenContainer.style.display = 'none';
-                        document.body.appendChild(hiddenContainer);
-
-                        // 創建新的 CircularAudioWave
-                        const newWheelWave = new CircularAudioWave(hiddenContainer, {
-                            loop: false,
-                            context: audioContext
-                        });
-
-                        // 銷毀舊的輪子音效（如果存在）
-                        if (window.wheelWave) {
-                            window.wheelWave.destroy();
-                        }
-
-                        // 更新全局引用
-                        window.wheelWave = newWheelWave;
-
-                        // 載入並播放音效
-                        newWheelWave.loadAudio('audio/RDP.wav')
-                            .then(() => {
-                                console.log('輪子音效載入成功');
-                                newWheelWave.play();
+                        // 檢查音效文件是否存在
+                        fetch('audio/RDP.wav')
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error('音效文件無法獲取');
+                                }
+                                return response.arrayBuffer();
                             })
-                            .catch((error) => {
-                                console.error('輪子音效載入失敗:', error);
-                            });
+                            .then(arrayBuffer => {
+                                // 創建新的音訊上下文
+                                const audioContext = new AudioContext();
 
+                                // 解碼音效
+                                audioContext.decodeAudioData(
+                                    arrayBuffer,
+                                    (audioBuffer) => {
+                                        console.log('音效解碼成功', audioBuffer);
+
+                                        // 創建音源節點
+                                        const sourceNode = audioContext.createBufferSource();
+                                        sourceNode.buffer = audioBuffer;
+
+                                        // 創建增益節點
+                                        const gainNode = audioContext.createGain();
+                                        gainNode.gain.value = 1.0; // 全音量
+
+                                        // 連接節點
+                                        sourceNode.connect(gainNode);
+                                        gainNode.connect(audioContext.destination);
+
+                                        // 播放音效
+                                        sourceNode.start(0);
+                                        console.log('音效直接播放成功');
+
+                                        // 結束事件
+                                        sourceNode.onended = () => {
+                                            console.log('音效播放結束');
+                                        };
+                                    },
+                                    (error) => {
+                                        console.error('音效解碼失敗:', error);
+                                    }
+                                );
+                            })
+                            .catch(error => {
+                                console.error('音效文件載入失敗:', error);
+                            });
                     } catch (err) {
-                        console.error('輪子音效觸發失敗:', err);
+                        console.error('輪子音效觸發總體失敗:', err);
                     }
                 }
             }
