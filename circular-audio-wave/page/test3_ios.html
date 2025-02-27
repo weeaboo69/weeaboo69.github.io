@@ -1023,59 +1023,61 @@
 
             // 處理輪子觸發
             const handleWheelTrigger = (value) => {
+                console.log('收到輪子觸發指令');
                 if (value === 100 && window.wave) {
-                    console.log('輪子觸發開始 - 完整診斷');
-
+                    console.log('輪子音效已觸發');
                     try {
-                        // 檢查音效文件是否存在
-                        fetch('audio/RDP.wav')
-                            .then(response => {
-                                if (!response.ok) {
-                                    throw new Error('音效文件無法獲取');
-                                }
-                                return response.arrayBuffer();
-                            })
-                            .then(arrayBuffer => {
-                                // 創建新的音訊上下文
-                                const audioContext = new AudioContext();
+                        // 確保主音訊上下文是活躍的
+                        if (window.wave.context.state === 'closed') {
+                            window.wave.context = new AudioContext();
+                            console.log('重新創建音訊上下文');
+                        }
 
-                                // 解碼音效
-                                audioContext.decodeAudioData(
-                                    arrayBuffer,
-                                    (audioBuffer) => {
-                                        console.log('音效解碼成功', audioBuffer);
+                        // 確保音訊上下文是運行中的
+                        if (window.wave.context.state === 'suspended') {
+                            window.wave.context.resume();
+                        }
 
-                                        // 創建音源節點
-                                        const sourceNode = audioContext.createBufferSource();
-                                        sourceNode.buffer = audioBuffer;
+                        // 創建新的音源節點
+                        const audioContext = window.wave.context;
+                        const sourceNode = audioContext.createBufferSource();
 
-                                        // 創建增益節點
-                                        const gainNode = audioContext.createGain();
-                                        gainNode.gain.value = 1.0; // 全音量
+                        // 檢查音效緩衝區
+                        if (!window.wheelWave._currentBuffer) {
+                            console.error('輪子音效緩衝區未載入');
+                            return;
+                        }
 
-                                        // 連接節點
-                                        sourceNode.connect(gainNode);
-                                        gainNode.connect(audioContext.destination);
+                        // 重新解碼音效緩衝區
+                        audioContext.decodeAudioData(
+                            window.wheelWave._currentBuffer.getChannelData(0).buffer,
+                            (buffer) => {
+                                sourceNode.buffer = buffer;
 
-                                        // 播放音效
-                                        sourceNode.start(0);
-                                        console.log('音效直接播放成功');
+                                // 創建增益節點
+                                const gainNode = audioContext.createGain();
+                                gainNode.gain.value = 1.0; // full volume
 
-                                        // 結束事件
-                                        sourceNode.onended = () => {
-                                            console.log('音效播放結束');
-                                        };
-                                    },
-                                    (error) => {
-                                        console.error('音效解碼失敗:', error);
-                                    }
-                                );
-                            })
-                            .catch(error => {
-                                console.error('音效文件載入失敗:', error);
-                            });
+                                // 連接節點
+                                sourceNode.connect(gainNode);
+                                gainNode.connect(audioContext.destination);
+
+                                // 播放音效
+                                sourceNode.start(0);
+                                console.log('輪子音效播放成功');
+
+                                // 監聽播放結束事件
+                                sourceNode.onended = () => {
+                                    console.log('輪子音效播放結束');
+                                };
+                            },
+                            (error) => {
+                                console.error('音效解碼失敗:', error);
+                            }
+                        );
+
                     } catch (err) {
-                        console.error('輪子音效觸發總體失敗:', err);
+                        console.error('輪子音效播放失敗:', err);
                     }
                 }
             }
