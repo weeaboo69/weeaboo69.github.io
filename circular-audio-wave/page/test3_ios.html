@@ -892,71 +892,91 @@
 
 
             const handleHornPositionValue = (dataValue) => {
-                console.log('收到喇叭數值:', dataValue);  // 增加詳細日誌
+                console.log('收到喇叭數值:', dataValue);
+
+                // 更新 UI 顯示的值
+                const hornDeviceElement = document.querySelector('[data-device-type="horn"]');
+                if (hornDeviceElement) {
+                    const valueSpan = hornDeviceElement.querySelector('.device-value');
+                    if (valueSpan) {
+                        valueSpan.textContent = dataValue;
+                    }
+                }
 
                 // 檢測是否為播放指令
                 if (dataValue === 254) {
-                    if (window.wave && window.hornWave && window.hornWave._currentBuffer) {
-                        try {
-                            // 確保音訊上下文是活躍的
-                            if (window.wave.context.state === 'suspended') {
-                                window.wave.context.resume();
-                            }
-
-                            // 立即播放音效
-                            const sourceNode = window.wave.context.createBufferSource();
-                            sourceNode.buffer = window.hornWave._currentBuffer;
-
-                            // 創建音量控制節點
-                            const gainNode = window.wave.context.createGain();
-                            gainNode.gain.setValueAtTime(1, window.wave.context.currentTime);
-
-                            sourceNode.connect(gainNode);
-                            gainNode.connect(window.wave.analyser);
-                            gainNode.connect(window.wave.context.destination);
-
-                            sourceNode.start(0);
-
-                            console.log('喇叭音效觸發成功');
-                        } catch (err) {
-                            console.error('喇叭音效播放失敗:', err);
+                    try {
+                        // 確保音效存在且已載入
+                        if (!window.hornWave || !window.hornWave._currentBuffer) {
+                            console.error('喇叭音效尚未載入');
+                            return;
                         }
+
+                        // 確保音訊上下文是活躍的
+                        const audioContext = window.wave.context;
+                        if (audioContext.state === 'suspended') {
+                            audioContext.resume();
+                        }
+
+                        // 創建音源節點
+                        const sourceNode = audioContext.createBufferSource();
+                        sourceNode.buffer = window.hornWave._currentBuffer;
+
+                        // 創建增益節點控制音量
+                        const gainNode = audioContext.createGain();
+                        gainNode.gain.setValueAtTime(1, audioContext.currentTime);
+
+                        // 連接節點
+                        sourceNode.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        gainNode.connect(window.wave.analyser);
+
+                        // 播放音效
+                        sourceNode.start(0);
+
+                        console.log('喇叭音效播放成功');
+                    } catch (err) {
+                        console.error('喇叭音效播放失敗:', err);
                     }
                 }
                 // 處理 0-100 的位置值
                 else if (dataValue <= 100) {
-                    if (window.wave && window.hornWave && window.hornWave._currentBuffer) {
-                        try {
-                            // 確保音訊上下文是活躍的
-                            if (window.wave.context.state === 'suspended') {
-                                window.wave.context.resume();
-                            }
-
-                            const bufferDuration = window.hornWave._currentBuffer.duration;
-
-                            // 根據接收的值計算播放位置和音量
-                            const playPosition = (dataValue / 100) * bufferDuration;
-                            const volume = dataValue / 100;  // 音量根據位置變化
-
-                            // 創建音源和音量控制節點
-                            const sourceNode = window.wave.context.createBufferSource();
-                            const gainNode = window.wave.context.createGain();
-
-                            sourceNode.buffer = window.hornWave._currentBuffer;
-                            sourceNode.connect(gainNode);
-                            gainNode.connect(window.wave.analyser);
-                            gainNode.connect(window.wave.context.destination);
-
-                            // 設置音量
-                            gainNode.gain.setValueAtTime(volume, window.wave.context.currentTime);
-
-                            // 從特定位置開始播放
-                            sourceNode.start(0, playPosition);
-
-                            console.log(`喇叭音效播放: 位置 ${playPosition}, 音量 ${volume}`);
-                        } catch (err) {
-                            console.error('喇叭音效位置播放失敗:', err);
+                    try {
+                        // 確保音效存在且已載入
+                        if (!window.hornWave || !window.hornWave._currentBuffer) {
+                            console.error('喇叭音效尚未載入');
+                            return;
                         }
+
+                        const audioContext = window.wave.context;
+                        if (audioContext.state === 'suspended') {
+                            audioContext.resume();
+                        }
+
+                        const bufferDuration = window.hornWave._currentBuffer.duration;
+
+                        // 計算播放位置和音量
+                        const playPosition = (dataValue / 100) * bufferDuration;
+                        const volume = dataValue / 100;
+
+                        // 創建音源和增益節點
+                        const sourceNode = audioContext.createBufferSource();
+                        const gainNode = audioContext.createGain();
+
+                        sourceNode.buffer = window.hornWave._currentBuffer;
+                        sourceNode.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        gainNode.connect(window.wave.analyser);
+
+                        // 設置音量
+                        gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+
+                        // 從特定位置開始播放
+                        sourceNode.start(0, playPosition, bufferDuration - playPosition);
+
+                        console.log(`喇叭音效播放: 位置 ${playPosition}, 音量 ${volume}`);
+                    } catch (err) {
+                        console.error('喇叭音效位置播放失敗:', err);
                     }
                 }
             };
