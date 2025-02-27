@@ -301,8 +301,6 @@ class CircularAudioWave {
             }
 
             this._debouncedDraw();
-        } else {
-            alert('Audio is not ready');
         }
     }
     // TODO
